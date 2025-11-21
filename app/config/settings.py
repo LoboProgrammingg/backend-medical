@@ -85,11 +85,38 @@ class Settings(BaseSettings):
 
     @field_validator("allowed_origins", mode="before")
     @classmethod
-    def parse_allowed_origins(cls, v: str | List[str]) -> List[str]:
+    def parse_allowed_origins(cls, v: str | List[str] | None) -> List[str]:
         """Parse origins string separada por vírgulas em lista."""
+        # Se for None ou string vazia, retornar default
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return ["http://localhost:3000"]
+        
+        # Se for string, tentar parse como JSON primeiro, senão tratar como CSV
         if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
+            v = v.strip()
+            # Se começar com [ ou {, tentar parse JSON
+            if v.startswith("[") or v.startswith("{"):
+                try:
+                    import json
+                    parsed = json.loads(v)
+                    if isinstance(parsed, list):
+                        return [str(origin).strip() for origin in parsed if origin]
+                    elif isinstance(parsed, str):
+                        return [parsed.strip()] if parsed.strip() else ["http://localhost:3000"]
+                except (json.JSONDecodeError, ValueError):
+                    # Se falhar, tratar como string simples
+                    pass
+            
+            # Tratar como string separada por vírgulas
+            origins = [origin.strip() for origin in v.split(",") if origin.strip()]
+            return origins if origins else ["http://localhost:3000"]
+        
+        # Se já for lista, retornar como está
+        if isinstance(v, list):
+            return [str(origin).strip() for origin in v if origin]
+        
+        # Fallback para default
+        return ["http://localhost:3000"]
 
     @property
     def max_upload_size_bytes(self) -> int:
