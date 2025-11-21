@@ -12,6 +12,9 @@ from app.config.settings import settings
 from app.utils.errors import AppError, AuthenticationError, ValidationError
 
 
+# Flag global para indicar se a aplicação está pronta
+_app_ready = False
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator:
     """
@@ -19,6 +22,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
 
     Inicializa recursos no startup e limpa no shutdown.
     """
+    global _app_ready
+    _app_ready = False
+    
     # Startup
     settings.create_storage_dirs()
     
@@ -41,8 +47,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
                 print(f"❌ Erro ao inicializar banco após {max_retries} tentativas: {e}")
                 print("⚠️ Aplicação continuará sem inicializar banco (pode causar erros)")
     
+    # Marcar aplicação como pronta
+    _app_ready = True
+    print("✅ Aplicação pronta para receber requisições")
+    
     yield
     # Shutdown
+    _app_ready = False
     await close_db()
 
 
@@ -99,6 +110,18 @@ def register_routes(app: FastAPI) -> None:
         Returns:
             dict: Status da aplicação.
         """
+        global _app_ready
+        if not _app_ready:
+            from fastapi import status
+            from fastapi.responses import JSONResponse
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={
+                    "status": "starting",
+                    "message": "Aplicação ainda está iniciando"
+                }
+            )
+        
         return {
             "status": "healthy",
             "app": settings.app_name,
