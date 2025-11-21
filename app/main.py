@@ -63,13 +63,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
 
 def create_application() -> FastAPI:
     """Factory para criar a aplicação FastAPI."""
+    # Habilitar docs sempre (útil para documentação da API)
+    # Em produção, pode ser desabilitado definindo ENABLE_DOCS=false
+    import os
+    enable_docs = os.getenv("ENABLE_DOCS", "true").lower() == "true"
+    
     app = FastAPI(
         title=settings.app_name,
         version=settings.app_version,
         debug=settings.debug,
         lifespan=lifespan,
-        docs_url="/docs" if settings.debug else None,
-        redoc_url="/redoc" if settings.debug else None,
+        docs_url="/docs" if enable_docs else None,
+        redoc_url="/redoc" if enable_docs else None,
     )
 
     # Middleware de logging para debug
