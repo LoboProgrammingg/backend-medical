@@ -46,7 +46,10 @@ EXPOSE 8001
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8001/health || exit 1
 
-# Comando para iniciar a aplicação (Railway define $PORT via variável de ambiente)
-# Usar formato shell para expandir variável corretamente
-CMD sh -c "uvicorn app.main:app --host 0.0.0.0 --port \"\${PORT:-8001}\""
+# Script de inicialização que expande PORT corretamente
+RUN echo '#!/bin/sh\nPORT=${PORT:-8001}\nexec uvicorn app.main:app --host 0.0.0.0 --port "$PORT"' > /app/start.sh && \
+    chmod +x /app/start.sh
+
+# Comando para iniciar a aplicação
+CMD ["/app/start.sh"]
 
