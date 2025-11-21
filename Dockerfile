@@ -46,11 +46,8 @@ EXPOSE 8001
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8001/health || exit 1
 
-# Script de inicialização que expande PORT corretamente
-RUN echo '#!/bin/sh\nPORT=${PORT:-8001}\nexec uvicorn app.main:app --host 0.0.0.0 --port "$PORT"' > /app/start.sh && \
-    chmod +x /app/start.sh
-
 # Comando para iniciar a aplicação
-# Usa sh -c para garantir que $PORT seja expandido corretamente
-CMD ["sh", "-c", "PORT=${PORT:-8001} exec uvicorn app.main:app --host 0.0.0.0 --port \"$PORT\""]
+# Railway define $PORT automaticamente, usamos ela diretamente
+# Se não estiver definida, usa 8001 como fallback
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8001}
 
