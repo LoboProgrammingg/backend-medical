@@ -21,7 +21,26 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     """
     # Startup
     settings.create_storage_dirs()
-    await init_db()
+    
+    # Tentar inicializar banco com retry
+    max_retries = 5
+    retry_delay = 2
+    
+    for attempt in range(max_retries):
+        try:
+            await init_db()
+            print("✅ Banco de dados inicializado com sucesso")
+            break
+        except Exception as e:
+            if attempt < max_retries - 1:
+                print(f"⚠️ Erro ao inicializar banco (tentativa {attempt + 1}/{max_retries}): {e}")
+                print(f"🔄 Tentando novamente em {retry_delay} segundos...")
+                import asyncio
+                await asyncio.sleep(retry_delay)
+            else:
+                print(f"❌ Erro ao inicializar banco após {max_retries} tentativas: {e}")
+                print("⚠️ Aplicação continuará sem inicializar banco (pode causar erros)")
+    
     yield
     # Shutdown
     await close_db()

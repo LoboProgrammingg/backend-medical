@@ -82,19 +82,36 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 async def init_db() -> None:
     """Inicializa o banco de dados criando todas as tabelas e extensões."""
     from sqlalchemy import text
+    import asyncio
     
-    async with engine.begin() as conn:
-        # Criar extensões necessárias
-        try:
-            await conn.execute(text('CREATE EXTENSION IF NOT EXISTS vector'))
-            await conn.execute(text('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"'))
-            print("✅ Extensões PostgreSQL criadas")
-        except Exception as e:
-            print(f"⚠️ Aviso ao criar extensões (podem já existir): {e}")
-        
-        # Criar tabelas
-        await conn.run_sync(Base.metadata.create_all)
-        print("✅ Tabelas criadas")
+    # Verificar conexão primeiro
+    try:
+        async with engine.begin() as conn:
+            # Testar conexão
+            await conn.execute(text("SELECT 1"))
+            print("✅ Conexão com banco de dados estabelecida")
+    except Exception as e:
+        print(f"❌ Erro ao conectar ao banco: {e}")
+        print(f"📋 DATABASE_URL: {get_database_url()[:50]}...")  # Mostrar início da URL
+        raise
+    
+    # Criar extensões e tabelas
+    try:
+        async with engine.begin() as conn:
+            # Criar extensões necessárias
+            try:
+                await conn.execute(text('CREATE EXTENSION IF NOT EXISTS vector'))
+                await conn.execute(text('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"'))
+                print("✅ Extensões PostgreSQL criadas")
+            except Exception as e:
+                print(f"⚠️ Aviso ao criar extensões (podem já existir ou não suportadas): {e}")
+            
+            # Criar tabelas
+            await conn.run_sync(Base.metadata.create_all)
+            print("✅ Tabelas criadas")
+    except Exception as e:
+        print(f"❌ Erro ao inicializar banco: {e}")
+        raise
 
 
 async def close_db() -> None:
