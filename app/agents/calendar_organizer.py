@@ -207,14 +207,23 @@ Seja objetiva e baseada em boas práticas médicas."""
             generation_config=generation_config,
         )
         
-        prompt = f"""Você é uma especialista em extrair calendários médicos de PDFs com PRECISÃO ABSOLUTA.
+        prompt = f"""Você é uma especialista em extrair calendários médicos de PDFs ou Excel com PRECISÃO ABSOLUTA.
 
 **INFORMAÇÕES DO USUÁRIO:**
 - Grupo: {group_number}
 - Nome: {name}
 - Posição na lista: {position}
 
-**TEXTO DO PDF:**
+**ESTRUTURA DO DOCUMENTO:**
+O documento pode ter esta estrutura:
+1. Seção "GRUPOS" no topo (lista de pessoas por grupo)
+2. Para cada semana (Semana 1, Semana 2, etc.):
+   - Tabela "MAPA RECEPTOR" com colunas: LOCAL | SETOR | HORÁRIO | PRINCIPAL RESPONSÁVEL | SEGUNDA | TERÇA | QUARTA | QUINTA | SEXTA | SÁBADO | DOMINGO
+   - Linha de datas abaixo dos dias: DD/MM para cada dia
+   - Tabela "PLANTÃO" com colunas: PLANTÃO | SEGUNDA | TERÇA | QUARTA | QUINTA | SEXTA | SÁBADO | DOMINGO
+   - Os plantões aparecem na tabela "PLANTÃO" com códigos como ({group_number}) {position} na COLUNA do dia correspondente
+
+**TEXTO DO DOCUMENTO (PDF ou Excel extraído):**
 {pdf_text[:15000]}  # Limitar para reduzir tempo de processamento
 
 **SUA TAREFA CRÍTICA:**
@@ -226,22 +235,58 @@ Seja objetiva e baseada em boas práticas médicas."""
 
 2. **EXTRAIR DIAS DE TRABALHO NORMAL:**
    - Procurar por "Semana 1", "Semana 2", etc.
-   - Identificar os dias da semana (Seg, Ter, Qua, Qui, Sex, Sáb, Dom)
-   - Extrair datas, locais, horários e tipos de turno
+   - Identificar os dias da semana: Seg, Ter, Qua, Qui, Sex, Sáb, Dom
+   - IMPORTANTE: Sáb = Sábado, Dom = Domingo - identifique corretamente!
+   - Extrair datas APENAS no formato DD/MM (ex: 03/11, 04/11) - NÃO converter para YYYY-MM-DD!
+   - NÃO tentar adivinhar o ano - extrair apenas dia e mês!
+   - Extrair locais, horários e tipos de turno
    - Organizar por semana e dia da semana
 
-3. **EXTRAIR PLANTÕES:**
-   - Procurar APENAS onde aparece ({group_number}) {position}
-   - Extrair data, local, tipo de plantão, horários
+3. **EXTRAIR PLANTÕES (CRÍTICO - PRECISÃO ABSOLUTA):**
+   
+   **REGRA FUNDAMENTAL:** O dia da semana do plantão é determinado pela COLUNA onde ele aparece no PDF, NÃO pelo dia que vem antes dele no texto!
+   
+   **PROCESSO OBRIGATÓRIO:**
+   1. Procurar APENAS onde aparece ({group_number}) {position} ou ({group_number}){position}
+   2. IDENTIFICAR A COLUNA: Verificar em qual COLUNA/DIA DA SEMANA o plantão aparece:
+      - Se está na coluna "Segunda" ou "Seg", day_of_week = "Seg"
+      - Se está na coluna "Terça" ou "Ter", day_of_week = "Ter"
+      - Se está na coluna "Quarta" ou "Qua", day_of_week = "Qua"
+      - Se está na coluna "Quinta" ou "Qui", day_of_week = "Qui"
+      - Se está na coluna "Sexta" ou "Sex", day_of_week = "Sex"
+      - Se está na coluna "Sábado" ou "Sáb", day_of_week = "Sáb"
+      - Se está na coluna "Domingo" ou "Dom", day_of_week = "Dom"
+   
+   3. IDENTIFICAR A DATA: Procurar pela data DD/MM na MESMA LINHA ou LINHA PRÓXIMA do plantão
+   4. EXTRAIR APENAS DD/MM - NÃO tentar adivinhar o ano!
+   
+   **ATENÇÃO CRÍTICA:**
+   - O plantão pode aparecer DEPOIS de um dia de trabalho no texto, mas o day_of_week é da COLUNA onde está!
+   - Exemplo: Se o texto mostra "Terça | Trabalho | ... | Plantão", mas o plantão está na COLUNA "Domingo", então day_of_week = "Dom"!
+   - NUNCA assuma que o plantão é do mesmo dia que aparece antes dele no texto!
+   - SEMPRE verifique a estrutura de colunas do PDF/planilha!
+   
+   - Extrair local, tipo de plantão, horários
    - Confirmar que é realmente um plantão
 
-4. **EXTRAIR PRECEPTOR RESPONSÁVEL:**
+4. **VALIDAÇÃO DE DATAS E DIAS (OBRIGATÓRIO):**
+   - VERIFICAR A ESTRUTURA DE COLUNAS: O PDF está estruturado como planilha com colunas
+   - Cada coluna representa um dia da semana (Seg, Ter, Qua, Qui, Sex, Sáb, Dom)
+   - O plantão pertence à COLUNA onde aparece, não ao texto ao redor
+   - Exemplo: Se o plantão está na coluna "Dom" com data "03/11", então:
+     - date: "03/11"
+     - day_of_week: "Dom" (da coluna, não do texto!)
+   - NÃO confundir: Se o plantão está na coluna "Dom", NÃO pode ser "Ter" ou qualquer outro dia!
+   - VALIDAR: A data DD/MM deve estar na mesma linha/coluna do plantão
+   - NÃO tentar adivinhar o ano - apenas extrair DD/MM!
+
+5. **EXTRAIR PRECEPTOR RESPONSÁVEL:**
    - Identificar o preceptor responsável de cada semana
    - Cada semana pode ter um preceptor diferente
    - Procurar por informações como "Preceptor", "Responsável", nomes de médicos/preceptores
    - Associar o preceptor à semana correspondente
 
-5. **RETORNAR JSON ESTRUTURADO:**
+6. **RETORNAR JSON ESTRUTURADO:**
 
 Você DEVE retornar APENAS um JSON válido com esta estrutura:
 
@@ -255,7 +300,7 @@ Você DEVE retornar APENAS um JSON válido com esta estrutura:
     {{
       "week": 1,
       "day_of_week": "Seg",
-      "date": "YYYY-MM-DD",
+      "date": "DD/MM",
       "type": "work",
       "location": "UPA1",
       "shift_type": "Sala Vermelha",
@@ -266,9 +311,9 @@ Você DEVE retornar APENAS um JSON válido com esta estrutura:
   ],
   "on_call_shifts": [
     {{
-      "date": "YYYY-MM-DD",
-      "day_of_week": "Qua",
-      "week": 1,
+      "date": "DD/MM",
+      "day_of_week": "Dom",
+      "week": 2,
       "location": "UPA1",
       "shift_type": "Plantão Cinderela",
       "start_time": "HH:MM",
@@ -278,13 +323,32 @@ Você DEVE retornar APENAS um JSON válido com esta estrutura:
   ]
 }}
 
-**REGRAS CRÍTICAS:**
-- PRECISÃO ABSOLUTA: Todas as datas devem estar corretas
-- VALIDAÇÃO: Verificar se as datas estão no período do calendário
-- SEM ERROS: Um erro pode fazer o médico perder um plantão!
+**REGRAS CRÍTICAS DE PRECISÃO:**
+- PRECISÃO ABSOLUTA: Todas as datas e dias da semana devem estar corretos
+- VALIDAÇÃO: Verificar se a data (DD/MM) corresponde ao dia da semana correto
+- DIAS DA SEMANA: Seg, Ter, Qua, Qui, Sex, Sáb, Dom - identifique corretamente!
+- PLANTÕES: Se está na coluna "Dom", day_of_week DEVE ser "Dom", não "Ter"!
+- DATAS: Extrair APENAS no formato DD/MM (ex: "03/11", "04/11") - NÃO incluir o ano!
+- NÃO ADIVINHAR O ANO: Apenas extrair dia e mês como aparecem no PDF!
+- SEM ERROS: Um erro pode fazer o médico perder um plantão ou ir no dia errado!
 - APENAS JSON: Retorne APENAS o JSON, sem texto adicional
-- DATAS: Use formato YYYY-MM-DD
 - HORÁRIOS: Use formato HH:MM (24h)
+
+**EXEMPLO DE EXTRAÇÃO CORRETA DE PLANTÃO:**
+- Se o PDF mostra (estrutura de planilha):
+  ```
+  Coluna Seg | Coluna Ter | Coluna Qua | ... | Coluna Dom
+  Trabalho   | Trabalho   | Trabalho   | ... | (7) A1 Plantão
+  27/10      | 28/10      | 29/10      | ... | 03/11
+  ```
+- Então o plantão:
+  - date: "03/11" (apenas DD/MM, sem ano!)
+  - day_of_week: "Dom" (da COLUNA onde está, não do texto!)
+  - week: calcular baseado na semana do calendário
+  
+**ERRO COMUM A EVITAR:**
+- NÃO fazer: Se o texto mostra "Terça | ... | Plantão", assumir que day_of_week = "Ter"
+- FAZER: Verificar em qual COLUNA o plantão está e usar o dia da semana dessa coluna!
 
 **RESPONDA APENAS COM O JSON, SEM TEXTO ADICIONAL:**"""
 

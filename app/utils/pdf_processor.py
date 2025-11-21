@@ -1,4 +1,4 @@
-"""Processador de PDFs para anotações."""
+"""Processador de PDFs e Excel para anotações."""
 
 import re
 import uuid
@@ -7,6 +7,7 @@ from typing import List
 
 import fitz
 import pdfplumber
+from openpyxl import load_workbook
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.note import Note

@@ -44,10 +44,10 @@ async def upload_calendar(
     db: Annotated[AsyncSession, Depends(get_db)] = None,
 ) -> CalendarResponse:
     """
-    Faz upload de um PDF de calendário e extrai dados com precisão.
+    Faz upload de um PDF ou Excel de calendário e extrai dados com precisão.
     
     Args:
-        file: Arquivo PDF do calendário
+        file: Arquivo PDF ou Excel (.xlsx, .xls) do calendário
         group_number: Número do grupo (ex: 7)
         name: Nome completo (ex: Tatiana Minakami)
         position: Posição na lista (ex: A1)
@@ -61,11 +61,12 @@ async def upload_calendar(
     print(f"[CALENDAR-UPLOAD] Iniciando upload: {file.filename}")
     print(f"[CALENDAR-UPLOAD] Grupo: {group_number}, Nome: {name}, Posição: {position}")
     
-    # Validar tipo de arquivo
-    if not file.filename.lower().endswith(".pdf"):
+    # Validar tipo de arquivo (PDF ou Excel)
+    file_ext = Path(file.filename).suffix.lower()
+    if file_ext not in [".pdf", ".xlsx", ".xls"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Apenas arquivos PDF são permitidos"
+            detail="Apenas arquivos PDF ou Excel (.xlsx, .xls) são permitidos"
         )
     
     # Salvar arquivo temporariamente
@@ -78,33 +79,56 @@ async def upload_calendar(
         with open(file_path, "wb") as f:
             f.write(content)
         
-        print(f"[CALENDAR-UPLOAD] PDF salvo. Extraindo texto...")
+        print(f"[CALENDAR-UPLOAD] Arquivo salvo. Extraindo texto...")
         
-        # Extrair texto do PDF (assíncrono em thread pool para não bloquear)
-        print(f"[CALENDAR-UPLOAD] Iniciando extração de texto do PDF...")
+        # Extrair texto do arquivo (PDF ou Excel)
+        print(f"[CALENDAR-UPLOAD] Iniciando extração de texto do arquivo ({file_ext})...")
         import asyncio
         loop = asyncio.get_event_loop()
         
         try:
-            pdf_text = await asyncio.wait_for(
-                loop.run_in_executor(
-                    None, 
-                    PDFProcessor.extract_text_from_pdf, 
-                    file_path
-                ),
-                timeout=30.0  # 30 segundos para extrair PDF
-            )
-            print(f"[CALENDAR-UPLOAD] ✅ Texto extraído: {len(pdf_text)} caracteres")
+            if file_ext == ".pdf":
+                # Usar extração ESTRUTURADA para calendários PDF (melhor para tabelas)
+                calendar_text = await asyncio.wait_for(
+                    loop.run_in_executor(
+                        None, 
+                        PDFProcessor.extract_structured_calendar_text, 
+                        file_path
+                    ),
+                    timeout=60.0  # 60 segundos para extrair PDF estruturado
+                )
+                print(f"[CALENDAR-UPLOAD] ✅ Texto estruturado (PDF) extraído: {len(calendar_text)} caracteres")
+            elif file_ext in [".xlsx", ".xls"]:
+                # Usar extração ESTRUTURADA para calendários Excel
+                calendar_text = await asyncio.wait_for(
+                    loop.run_in_executor(
+                        None, 
+                        PDFProcessor.extract_structured_calendar_from_excel, 
+                        file_path
+                    ),
+                    timeout=60.0  # 60 segundos para extrair Excel estruturado
+                )
+                print(f"[CALENDAR-UPLOAD] ✅ Texto estruturado (Excel) extraído: {len(calendar_text)} caracteres")
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Formato de arquivo não suportado: {file_ext}"
+                )
         except asyncio.TimeoutError:
             raise HTTPException(
                 status_code=status.HTTP_408_REQUEST_TIMEOUT,
-                detail="Timeout ao extrair texto do PDF. O arquivo pode estar muito grande ou corrompido."
+                detail="Timeout ao extrair texto do arquivo. O arquivo pode estar muito grande ou corrompido."
             )
-        
-        if not pdf_text or len(pdf_text) < 100:
+        except ValueError as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Não foi possível extrair texto suficiente do PDF. Verifique se o arquivo está correto."
+                detail=str(e)
+            )
+        
+        if not calendar_text or len(calendar_text) < 100:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Não foi possível extrair texto suficiente do arquivo. Verifique se o arquivo está correto."
             )
         
         # Usar CalendarOrganizerAgent para extrair dados
@@ -114,7 +138,7 @@ async def upload_calendar(
         try:
             calendar_data = await asyncio.wait_for(
                 agent.extract_calendar_from_pdf(
-                    pdf_text=pdf_text,
+                    pdf_text=calendar_text,
                     group_number=group_number,
                     name=name,
                     position=position,
