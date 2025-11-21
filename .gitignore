@@ -27,7 +27,7 @@ ENV/
 .venv
 
 # Poetry
-poetry.lock
+# poetry.lock - Mantido no repositório para builds consistentes
 
 # Environment variables
 .env
