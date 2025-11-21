@@ -42,9 +42,9 @@ RUN mkdir -p storage/temp storage/documents storage/exports
 # Expor porta (Railway usa variável $PORT, mas EXPOSE precisa de número)
 EXPOSE 8001
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8001/health || exit 1
+# Health check (usa $PORT do Railway, fallback para 8001)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD sh -c 'curl -f http://localhost:${PORT:-8001}/health || exit 1'
 
 # Comando para iniciar a aplicação
 # Railway define $PORT automaticamente (geralmente 8080)
