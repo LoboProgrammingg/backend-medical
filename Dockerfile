@@ -51,5 +51,6 @@ RUN echo '#!/bin/sh\nPORT=${PORT:-8001}\nexec uvicorn app.main:app --host 0.0.0.
     chmod +x /app/start.sh
 
 # Comando para iniciar a aplicação
-CMD ["/app/start.sh"]
+# Usa sh -c para garantir que $PORT seja expandido corretamente
+CMD ["sh", "-c", "PORT=${PORT:-8001} exec uvicorn app.main:app --host 0.0.0.0 --port \"$PORT\""]
 
