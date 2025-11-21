@@ -43,7 +43,7 @@ async def register(
     return LoginResponse(
         access_token=access_token,
         token_type="bearer",
-        user=user,
+        user=user.model_dump(),  # Converter UserResponse para dict
     )
 
 
