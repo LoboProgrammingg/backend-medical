@@ -2,7 +2,8 @@
 
 from functools import lru_cache
 from pathlib import Path
-from typing import List
+from typing import List, Union
+import json
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -74,8 +75,9 @@ class Settings(BaseSettings):
     debug: bool = Field(default=False, description="Modo debug")
     app_name: str = Field(default="Amorinha", description="Nome da aplicação")
     app_version: str = Field(default="0.1.0", description="Versão da aplicação")
-    allowed_origins: List[str] = Field(
-        default=["http://localhost:3000"], description="Origens permitidas para CORS"
+    # Usar Union para evitar parse JSON automático do Pydantic
+    allowed_origins: Union[str, List[str]] = Field(
+        default="http://localhost:3000", description="Origens permitidas para CORS (separadas por vírgula ou JSON array)"
     )
 
     # Server
@@ -85,22 +87,25 @@ class Settings(BaseSettings):
 
     @field_validator("allowed_origins", mode="before")
     @classmethod
-    def parse_allowed_origins(cls, v: str | List[str] | None) -> List[str]:
+    def parse_allowed_origins(cls, v: Union[str, List[str], None]) -> List[str]:
         """Parse origins string separada por vírgulas em lista."""
         # Se for None ou string vazia, retornar default
-        if v is None or (isinstance(v, str) and not v.strip()):
+        if v is None:
             return ["http://localhost:3000"]
         
-        # Se for string, tentar parse como JSON primeiro, senão tratar como CSV
         if isinstance(v, str):
             v = v.strip()
+            # Se vazio, retornar default
+            if not v:
+                return ["http://localhost:3000"]
+            
             # Se começar com [ ou {, tentar parse JSON
             if v.startswith("[") or v.startswith("{"):
                 try:
-                    import json
                     parsed = json.loads(v)
                     if isinstance(parsed, list):
-                        return [str(origin).strip() for origin in parsed if origin]
+                        origins = [str(origin).strip() for origin in parsed if origin]
+                        return origins if origins else ["http://localhost:3000"]
                     elif isinstance(parsed, str):
                         return [parsed.strip()] if parsed.strip() else ["http://localhost:3000"]
                 except (json.JSONDecodeError, ValueError):
@@ -113,10 +118,18 @@ class Settings(BaseSettings):
         
         # Se já for lista, retornar como está
         if isinstance(v, list):
-            return [str(origin).strip() for origin in v if origin]
+            origins = [str(origin).strip() for origin in v if origin]
+            return origins if origins else ["http://localhost:3000"]
         
         # Fallback para default
         return ["http://localhost:3000"]
+    
+    @property
+    def allowed_origins_list(self) -> List[str]:
+        """Retorna allowed_origins sempre como lista."""
+        if isinstance(self.allowed_origins, list):
+            return self.allowed_origins
+        return self.parse_allowed_origins(self.allowed_origins)
 
     @property
     def max_upload_size_bytes(self) -> int:
