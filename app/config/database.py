@@ -150,22 +150,31 @@ async def init_db() -> None:
     
     # Criar extensões e tabelas
     try:
+        # Criar extensões em transações separadas para evitar abortar tudo
         async with engine.begin() as conn:
-            # Criar extensões necessárias
             try:
-                await conn.execute(text('CREATE EXTENSION IF NOT EXISTS vector'))
                 await conn.execute(text('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"'))
-                print("✅ Extensões PostgreSQL criadas")
+                print("✅ Extensão uuid-ossp criada/verificada")
             except Exception as e:
-                ext_error = str(e)
-                if "does not exist" in ext_error.lower():
-                    print(f"⚠️ Extensão não disponível (pgvector pode não estar instalado): {ext_error}")
-                else:
-                    print(f"⚠️ Aviso ao criar extensões: {ext_error}")
-            
-            # Criar tabelas
+                print(f"⚠️ Aviso ao criar extensão uuid-ossp: {e}")
+        
+        # Tentar criar extensão vector (pode não estar disponível no Railway)
+        try:
+            async with engine.begin() as conn:
+                await conn.execute(text('CREATE EXTENSION IF NOT EXISTS vector'))
+                print("✅ Extensão vector criada/verificada")
+        except Exception as e:
+            error_str = str(e).lower()
+            if "vector" in error_str or "extension" in error_str or "not available" in error_str:
+                print(f"⚠️ Extensão vector não disponível (normal no Railway sem pgvector)")
+                print("💡 A aplicação continuará sem suporte a embeddings vetoriais")
+            else:
+                print(f"⚠️ Aviso ao criar extensão vector: {e}")
+        
+        # Criar tabelas em transação separada e limpa
+        async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-            print("✅ Tabelas criadas")
+            print("✅ Tabelas criadas/verificadas")
     except Exception as e:
         print(f"❌ Erro ao inicializar banco: {e}")
         raise
