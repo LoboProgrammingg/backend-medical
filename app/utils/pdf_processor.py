@@ -375,6 +375,131 @@ class PDFProcessor:
             return PDFProcessor.extract_text_from_pdf(pdf_path)
 
     @staticmethod
+    def extract_structured_calendar_from_excel(excel_path: Path) -> str:
+        """
+        Extrai texto ESTRUTURADO de um arquivo Excel de calendário médico.
+        
+        Trata o Excel como planilha, mantendo:
+        - Estrutura de células e colunas
+        - Relação entre linhas e colunas
+        - Organização por semanas e dias
+        - Tabelas MAPA RECEPTOR e PLANTÃO
+        
+        Args:
+            excel_path: Caminho para o arquivo Excel (.xlsx).
+            
+        Returns:
+            str: Texto estruturado do calendário, bem organizado.
+        """
+        try:
+            print(f"📊 Extraindo calendário estruturado de Excel: {excel_path.name}")
+            
+            structured_parts = []
+            
+            # Carregar workbook
+            workbook = load_workbook(str(excel_path), data_only=True)
+            
+            for sheet_name in workbook.sheetnames:
+                sheet = workbook[sheet_name]
+                print(f"   📄 Processando planilha: {sheet_name}")
+                
+                structured_parts.append(f"\n{'='*100}")
+                structured_parts.append(f"PLANILHA: {sheet_name}")
+                structured_parts.append(f"{'='*100}\n")
+                
+                # Processar cada linha da planilha
+                for row_num, row in enumerate(sheet.iter_rows(values_only=True), 1):
+                    if row:  # Linha não vazia
+                        # Processar células mantendo estrutura
+                        processed_cells = []
+                        for col_num, cell in enumerate(row, 1):
+                            if cell is not None:
+                                cell_text = str(cell).strip()
+                                # Limpar quebras de linha e espaços múltiplos
+                                cell_text = re.sub(r'\s+', ' ', cell_text)
+                                if cell_text:
+                                    processed_cells.append(cell_text)
+                                else:
+                                    processed_cells.append("")  # Célula vazia
+                            else:
+                                processed_cells.append("")  # Célula None
+                        
+                        # Juntar células com " | " para manter estrutura de colunas
+                        row_text = " | ".join(processed_cells)
+                        
+                        # Adicionar apenas se houver conteúdo
+                        if row_text.strip() and row_text.strip() != "|":
+                            structured_parts.append(f"Linha {row_num:3d}: {row_text}")
+                
+                structured_parts.append("\n")
+            
+            workbook.close()
+            
+            # Juntar tudo
+            full_text = "\n".join(structured_parts)
+            
+            # PÓS-PROCESSAMENTO: Organizar melhor o texto estruturado
+            # 1. Identificar e marcar semanas
+            full_text = re.sub(
+                r'(?i)(semana\s*\d+|Semana\s*\d+|SEMANA\s*\d+)',
+                r'\n\n' + '='*80 + '\n### \1 ###\n' + '='*80 + '\n',
+                full_text
+            )
+            
+            # 2. Identificar tabelas MAPA RECEPTOR e PLANTÃO
+            full_text = re.sub(
+                r'(?i)(mapa\s*receptor|MAPA\s*RECEPTOR)',
+                r'\n\n>>> MAPA RECEPTOR <<<\n',
+                full_text
+            )
+            full_text = re.sub(
+                r'(?i)(plantão|plantao|Plantão|PLANTÃO)',
+                r'\n>>> 🚨 PLANTÃO 🚨 <<<\n',
+                full_text
+            )
+            
+            # 3. Identificar dias da semana
+            full_text = re.sub(
+                r'(?i)\b(Segunda|Terça|Quarta|Quinta|Sexta|Sábado|Domingo|Seg|Ter|Qua|Qui|Sex|Sáb|Dom)\b',
+                r'\n--- \1 ---\n',
+                full_text
+            )
+            
+            # 4. Identificar preceptores
+            full_text = re.sub(
+                r'(?i)(preceptor|Preceptor|PRECEPTOR|principal\s*responsável)',
+                r'\n👨‍⚕️ \1',
+                full_text
+            )
+            
+            # 5. Limpar espaços extras mas manter estrutura
+            full_text = re.sub(r'\n{4,}', '\n\n\n', full_text)
+            full_text = re.sub(r' {3,}', ' ', full_text)
+            full_text = re.sub(r'\n +', '\n', full_text)
+            
+            # 6. Remover linhas completamente vazias duplicadas
+            lines = full_text.split('\n')
+            cleaned_lines = []
+            prev_empty = False
+            for line in lines:
+                is_empty = not line.strip()
+                if not (is_empty and prev_empty):
+                    cleaned_lines.append(line)
+                prev_empty = is_empty
+            full_text = '\n'.join(cleaned_lines)
+            
+            print(f"✅ Calendário estruturado (Excel) extraído: {len(full_text)} caracteres")
+            print(f"   📊 Estrutura: {full_text.count('PLANILHA')} planilhas, {full_text.count('Semana')} semanas, {full_text.count('|')} separadores de coluna")
+            
+            return full_text.strip()
+            
+        except Exception as e:
+            print(f"❌ Erro ao extrair calendário do Excel: {e}")
+            import traceback
+            traceback.print_exc()
+            raise ValueError(f"Erro ao processar arquivo Excel: {str(e)}")
+
+    @staticmethod
     def extract_text_from_pdf(pdf_path: Path) -> str:
         """
         Extrai texto SIMPLES de um PDF apenas para embeddings (RAG).
