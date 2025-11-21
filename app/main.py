@@ -49,7 +49,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     
     # Marcar aplicação como pronta
     _app_ready = True
-    print("✅ Aplicação pronta para receber requisições")
+    import os
+    port = os.getenv("PORT", "8001")
+    print(f"✅ Aplicação pronta para receber requisições na porta {port}")
+    print(f"✅ Health check disponível em: http://0.0.0.0:{port}/health")
+    print(f"✅ Root endpoint disponível em: http://0.0.0.0:{port}/")
     
     yield
     # Shutdown
@@ -99,6 +103,30 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(official_sources.router)
     app.include_router(calendar.router)
     app.include_router(gems.router)
+
+    @app.get("/", tags=["Root"])
+    async def root() -> dict:
+        """
+        Endpoint raiz da aplicação.
+        
+        Retorna status 200 quando a aplicação está pronta, 503 se ainda estiver iniciando.
+        """
+        global _app_ready
+        if not _app_ready:
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={
+                    "status": "starting",
+                    "message": "Aplicação ainda está iniciando"
+                }
+            )
+        
+        return {
+            "status": "healthy",
+            "app": settings.app_name,
+            "version": settings.app_version,
+            "message": "Backend Amorinha está funcionando!"
+        }
 
     @app.get("/health", tags=["Health"])
     async def health_check() -> dict:
