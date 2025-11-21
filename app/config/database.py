@@ -27,8 +27,18 @@ def get_database_url() -> str:
     
     # Debug: verificar todas as variáveis de ambiente relacionadas
     print("🔍 Verificando variáveis de ambiente...")
+    
+    # Listar TODAS as variáveis de ambiente que contêm "DATABASE" ou "POSTGRES"
+    all_env_vars = {k: v for k, v in os.environ.items() if "DATABASE" in k.upper() or "POSTGRES" in k.upper()}
+    print(f"   📋 Variáveis relacionadas encontradas: {len(all_env_vars)}")
+    for key, value in all_env_vars.items():
+        print(f"      {key}: {value[:60]}...")
+    
     db_url_env = os.getenv("DATABASE_URL")
     db_public_url_env = os.getenv("DATABASE_PUBLIC_URL")
+    
+    # Tentar também variáveis alternativas do Railway
+    railway_db_url = os.getenv("RAILWAY_DATABASE_URL") or os.getenv("POSTGRES_URL")
     
     print(f"   DATABASE_URL presente: {'✅ SIM' if db_url_env else '❌ NÃO'}")
     if db_url_env:
@@ -38,9 +48,13 @@ def get_database_url() -> str:
     if db_public_url_env:
         print(f"   DATABASE_PUBLIC_URL valor: {db_public_url_env[:60]}...")
     
+    if railway_db_url:
+        print(f"   ⚠️ RAILWAY_DATABASE_URL ou POSTGRES_URL encontrada: {railway_db_url[:60]}...")
+    
     # Railway fornece DATABASE_URL (privada, sem custos) e DATABASE_PUBLIC_URL (pública, com custos)
     # Preferimos DATABASE_URL (privada) para evitar custos de egress
-    db_url = db_url_env or db_public_url_env
+    # Também tentamos variáveis alternativas do Railway
+    db_url = db_url_env or db_public_url_env or railway_db_url
     
     # Se não encontrou nas variáveis de ambiente, usar settings
     if not db_url:
