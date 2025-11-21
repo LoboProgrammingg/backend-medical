@@ -36,13 +36,13 @@ COPY . .
 # Criar diretórios necessários
 RUN mkdir -p storage/temp storage/documents storage/exports
 
-# Expor porta
-EXPOSE 8001
+# Expor porta (Railway usa variável $PORT)
+EXPOSE $PORT
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8001/health || exit 1
+    CMD curl -f http://localhost:${PORT:-8001}/health || exit 1
 
-# Comando para iniciar a aplicação
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
+# Comando para iniciar a aplicação (Railway define $PORT)
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8001}
 
