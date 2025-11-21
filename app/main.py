@@ -90,20 +90,9 @@ def create_application() -> FastAPI:
 def register_routes(app: FastAPI) -> None:
     """Registra todas as rotas da aplicação."""
     
-    # Importar rotas
-    from app.api.routes import agents, auth, calendar, conversations, documents, gems, notes, rag, official_sources
+    # IMPORTANTE: Registrar endpoints raiz ANTES dos routers
+    # para garantir que sejam encontrados primeiro
     
-    # Registrar routers
-    app.include_router(auth.router)
-    app.include_router(notes.router)
-    app.include_router(rag.router)
-    app.include_router(documents.router)
-    app.include_router(agents.router)
-    app.include_router(conversations.router)
-    app.include_router(official_sources.router)
-    app.include_router(calendar.router)
-    app.include_router(gems.router)
-
     @app.get("/", tags=["Root"])
     async def root() -> dict:
         """
@@ -112,7 +101,10 @@ def register_routes(app: FastAPI) -> None:
         Retorna status 200 quando a aplicação está pronta, 503 se ainda estiver iniciando.
         """
         global _app_ready
+        print(f"🔍 [ROOT] Endpoint '/' chamado - _app_ready: {_app_ready}")
+        
         if not _app_ready:
+            print("⚠️ [ROOT] Retornando 503 - app ainda iniciando")
             return JSONResponse(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 content={
@@ -121,6 +113,7 @@ def register_routes(app: FastAPI) -> None:
                 }
             )
         
+        print("✅ [ROOT] Retornando 200 - app pronta")
         return {
             "status": "healthy",
             "app": settings.app_name,
@@ -139,7 +132,10 @@ def register_routes(app: FastAPI) -> None:
             dict ou JSONResponse: Status da aplicação.
         """
         global _app_ready
+        print(f"🔍 [HEALTH] Endpoint '/health' chamado - _app_ready: {_app_ready}")
+        
         if not _app_ready:
+            print("⚠️ [HEALTH] Retornando 503 - app ainda iniciando")
             return JSONResponse(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 content={
@@ -148,11 +144,28 @@ def register_routes(app: FastAPI) -> None:
                 }
             )
         
+        print("✅ [HEALTH] Retornando 200 - app pronta")
         return {
             "status": "healthy",
             "app": settings.app_name,
             "version": settings.app_version,
         }
+    
+    # Importar rotas
+    from app.api.routes import agents, auth, calendar, conversations, documents, gems, notes, rag, official_sources
+    
+    # Registrar routers (depois dos endpoints raiz)
+    app.include_router(auth.router)
+    app.include_router(notes.router)
+    app.include_router(rag.router)
+    app.include_router(documents.router)
+    app.include_router(agents.router)
+    app.include_router(conversations.router)
+    app.include_router(official_sources.router)
+    app.include_router(calendar.router)
+    app.include_router(gems.router)
+    
+    print("✅ Todas as rotas registradas")
 
     # Exception handlers
     @app.exception_handler(AppError)
