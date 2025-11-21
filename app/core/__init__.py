@@ -1,0 +1,2 @@
+"""Funcionalidades core da aplicação."""
+

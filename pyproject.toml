@@ -1,0 +1,67 @@
+[tool.poetry]
+name = "amorinha-backend"
+version = "0.1.0"
+description = "Sistema de auxílio médico com IA para estudantes de medicina"
+authors = ["LobosProgramming"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.115.0"
+uvicorn = {extras = ["standard"], version = "^0.32.0"}
+sqlalchemy = {extras = ["asyncio"], version = "^2.0.36"}
+asyncpg = "^0.30.0"
+alembic = "^1.14.0"
+pydantic = {extras = ["email"], version = "^2.10.0"}
+pydantic-settings = "^2.6.0"
+python-jose = {extras = ["cryptography"], version = "^3.3.0"}
+bcrypt = "^4.2.0"
+python-multipart = "^0.0.17"
+langchain = "^0.3.0"
+langchain-google-genai = "^2.0.0"
+langgraph = "^0.2.45"
+pgvector = "^0.3.6"
+pypdf2 = "^3.0.1"
+python-docx = "^1.1.2"
+aiofiles = "^24.1.0"
+google-generativeai = "^0.8.5"
+pypdf = "^6.3.0"
+numpy = "^2.3.5"
+tavily-python = "^0.7.13"
+pymupdf = "^1.26.6"
+pdfplumber = "^0.11.8"
+aiohttp = "^3.13.2"
+beautifulsoup4 = "^4.14.2"
+pillow = "^11.0.0"
+openpyxl = "^3.1.5"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.0"
+pytest-asyncio = "^0.24.0"
+httpx = "^0.28.0"
+black = "^24.10.0"
+ruff = "^0.8.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+include = '\.pyi?$'
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+select = ["E", "F", "I", "N", "W"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+
