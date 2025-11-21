@@ -153,12 +153,36 @@ async def upload_calendar(
         db.add(calendar)
         await db.flush()  # Para obter o ID
         
+        # Função auxiliar para converter DD/MM para YYYY-MM-DD usando 2025 como ano
+        def parse_date_with_year(date_str: str, calendar_start: date, calendar_end: date) -> date:
+            """Converte DD/MM para YYYY-MM-DD usando 2025 como ano base."""
+            try:
+                # Tentar primeiro como DD/MM
+                day, month = map(int, date_str.split("/"))
+                # SEMPRE usar 2025 como ano (estamos em 2025)
+                year = 2025
+                event_date = date(year, month, day)
+                
+                # Validar que a data está dentro do período do calendário
+                if event_date < calendar_start or event_date > calendar_end:
+                    # Se estiver fora do período, pode ser que o calendário cruze o ano
+                    # Mas mantemos 2025 como padrão
+                    print(f"⚠️ [CALENDAR] Data {event_date} fora do período {calendar_start} - {calendar_end}, mas usando 2025")
+                
+                return event_date
+            except (ValueError, AttributeError):
+                # Se falhar, tentar como YYYY-MM-DD (compatibilidade)
+                try:
+                    return datetime.strptime(date_str, "%Y-%m-%d").date()
+                except ValueError:
+                    raise ValueError(f"Formato de data inválido: {date_str}")
+        
         # Criar eventos em batch (muito mais rápido)
         events_to_add = []
         
         # Processar dias de trabalho
         for work_day in calendar_data.get("work_days", []):
-            event_date = datetime.strptime(work_day["date"], "%Y-%m-%d").date()
+            event_date = parse_date_with_year(work_day["date"], calendar.start_date, calendar.end_date)
             start_time_obj = None
             end_time_obj = None
             
@@ -182,7 +206,7 @@ async def upload_calendar(
         
         # Processar plantões
         for shift in calendar_data.get("on_call_shifts", []):
-            event_date = datetime.strptime(shift["date"], "%Y-%m-%d").date()
+            event_date = parse_date_with_year(shift["date"], calendar.start_date, calendar.end_date)
             start_time_obj = None
             end_time_obj = None
             
