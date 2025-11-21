@@ -105,15 +105,13 @@ def register_routes(app: FastAPI) -> None:
         """
         Health check endpoint para Railway.
         
-        Retorna status 200 imediatamente para indicar que o servidor está pronto.
+        Retorna status 200 quando a aplicação está pronta, 503 se ainda estiver iniciando.
 
         Returns:
-            dict: Status da aplicação.
+            dict ou JSONResponse: Status da aplicação.
         """
         global _app_ready
         if not _app_ready:
-            from fastapi import status
-            from fastapi.responses import JSONResponse
             return JSONResponse(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 content={
