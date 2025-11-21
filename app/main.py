@@ -92,7 +92,9 @@ def register_routes(app: FastAPI) -> None:
     @app.get("/health", tags=["Health"])
     async def health_check() -> dict:
         """
-        Health check endpoint.
+        Health check endpoint para Railway.
+        
+        Retorna status 200 imediatamente para indicar que o servidor está pronto.
 
         Returns:
             dict: Status da aplicação.
@@ -101,6 +103,19 @@ def register_routes(app: FastAPI) -> None:
             "status": "healthy",
             "app": settings.app_name,
             "version": settings.app_version,
+        }
+    
+    @app.get("/", tags=["Root"])
+    async def root() -> dict:
+        """
+        Endpoint raiz.
+
+        Returns:
+            dict: Mensagem de boas-vindas.
+        """
+        return {
+            "message": f"Bem-vinda ao {settings.app_name}! 💝",
+            "docs": "/docs" if settings.debug else "Documentação disponível apenas em modo debug",
         }
 
     @app.get("/", tags=["Root"])

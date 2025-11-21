@@ -43,7 +43,8 @@ RUN mkdir -p storage/temp storage/documents storage/exports
 EXPOSE 8001
 
 # Health check (usa $PORT do Railway, fallback para 8001)
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+# Start period aumentado para dar tempo do servidor iniciar completamente
+HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=5 \
     CMD sh -c 'curl -f http://localhost:${PORT:-8001}/health || exit 1'
 
 # Comando para iniciar a aplicação
