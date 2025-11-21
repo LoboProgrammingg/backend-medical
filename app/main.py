@@ -72,6 +72,15 @@ def create_application() -> FastAPI:
         redoc_url="/redoc" if settings.debug else None,
     )
 
+    # Middleware de logging para debug
+    @app.middleware("http")
+    async def log_requests(request: Request, call_next):
+        """Middleware para logar todas as requisições."""
+        print(f"🌐 [MIDDLEWARE] {request.method} {request.url.path} - Client: {request.client.host if request.client else 'unknown'}")
+        response = await call_next(request)
+        print(f"✅ [MIDDLEWARE] {request.method} {request.url.path} - Status: {response.status_code}")
+        return response
+
     # Configurar CORS
     app.add_middleware(
         CORSMiddleware,
