@@ -15,8 +15,18 @@ def get_database_url() -> str:
     
     Railway fornece DATABASE_URL no formato postgresql://
     mas precisamos postgresql+asyncpg:// para asyncpg.
+    
+    Prioridade:
+    1. DATABASE_PUBLIC_URL (se disponível, para acesso externo)
+    2. DATABASE_URL (URL interna do Railway)
+    3. settings.database_url (fallback)
     """
-    db_url = settings.database_url
+    import os
+    
+    # Railway fornece DATABASE_PUBLIC_URL para acesso externo
+    # e DATABASE_URL para acesso interno
+    # Preferimos DATABASE_PUBLIC_URL se disponível
+    db_url = os.getenv("DATABASE_PUBLIC_URL") or os.getenv("DATABASE_URL") or settings.database_url
     
     # Se for do Railway (postgresql://), converter para asyncpg
     if db_url.startswith("postgresql://") and "+asyncpg" not in db_url:
