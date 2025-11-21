@@ -143,13 +143,13 @@ async def upload_calendar(
                     name=name,
                     position=position,
                 ),
-                timeout=120.0  # 120 segundos para processar com IA
+                timeout=220.0  # 180 segundos (3 minutos) para processar com IA
             )
             print(f"[CALENDAR-UPLOAD] ✅ Dados extraídos pela IA")
         except asyncio.TimeoutError:
             raise HTTPException(
                 status_code=status.HTTP_408_REQUEST_TIMEOUT,
-                detail="Timeout ao processar calendário com IA. Tente novamente ou use um PDF menor."
+                detail="Timeout ao processar calendário com IA. O arquivo pode estar muito grande. Tente novamente ou use um arquivo menor."
             )
         except Exception as e:
             print(f"[CALENDAR-UPLOAD] ❌ Erro na extração: {e}")

@@ -237,7 +237,7 @@ O documento tem esta estrutura específica (como planilha):
    - Exemplo: Se (7) A1 aparece na coluna "DOMINGO", então day_of_week = "Dom", mesmo que o texto mostre outra coisa antes
 
 **TEXTO DO DOCUMENTO (PDF ou Excel extraído):**
-{pdf_text[:15000]}  # Limitar para reduzir tempo de processamento
+{pdf_text[:20000]}  # Limitar para reduzir tempo de processamento (aumentado para melhor precisão)
 
 **SUA TAREFA CRÍTICA:**
 
@@ -400,7 +400,7 @@ Você DEVE retornar APENAS um JSON válido com esta estrutura:
                 
                 response = await asyncio.wait_for(
                     loop.run_in_executor(None, generate_sync),
-                    timeout=90.0  # 90 segundos máximo
+                    timeout=150.0  # 150 segundos (2.5 minutos) máximo para Gemini processar
                 )
                 
                 if not response or not hasattr(response, 'text'):
