@@ -82,17 +82,29 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 async def init_db() -> None:
     """Inicializa o banco de dados criando todas as tabelas e extensões."""
     from sqlalchemy import text
-    import asyncio
+    
+    db_url = get_database_url()
+    print(f"🔍 Tentando conectar ao banco...")
+    print(f"📋 DATABASE_URL: {db_url[:60]}...")  # Mostrar início da URL (sem senha)
     
     # Verificar conexão primeiro
     try:
         async with engine.begin() as conn:
             # Testar conexão
-            await conn.execute(text("SELECT 1"))
+            result = await conn.execute(text("SELECT 1"))
             print("✅ Conexão com banco de dados estabelecida")
     except Exception as e:
-        print(f"❌ Erro ao conectar ao banco: {e}")
-        print(f"📋 DATABASE_URL: {get_database_url()[:50]}...")  # Mostrar início da URL
+        error_msg = str(e)
+        print(f"❌ Erro ao conectar ao banco: {error_msg}")
+        
+        # Verificar se é problema de URL
+        if "postgresql" not in db_url.lower():
+            print("⚠️ DATABASE_URL não parece ser uma URL PostgreSQL válida")
+        
+        # Verificar se é problema de conexão
+        if "connection" in error_msg.lower() or "refused" in error_msg.lower():
+            print("⚠️ Verifique se o PostgreSQL está rodando e acessível")
+        
         raise
     
     # Criar extensões e tabelas
@@ -104,7 +116,11 @@ async def init_db() -> None:
                 await conn.execute(text('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"'))
                 print("✅ Extensões PostgreSQL criadas")
             except Exception as e:
-                print(f"⚠️ Aviso ao criar extensões (podem já existir ou não suportadas): {e}")
+                ext_error = str(e)
+                if "does not exist" in ext_error.lower():
+                    print(f"⚠️ Extensão não disponível (pgvector pode não estar instalado): {ext_error}")
+                else:
+                    print(f"⚠️ Aviso ao criar extensões: {ext_error}")
             
             # Criar tabelas
             await conn.run_sync(Base.metadata.create_all)
