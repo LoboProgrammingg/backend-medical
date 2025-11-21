@@ -149,6 +149,8 @@ async def init_db() -> None:
         raise
     
     # Criar extensões e tabelas
+    vector_available = False
+    
     try:
         # Criar extensões em transações separadas para evitar abortar tudo
         async with engine.begin() as conn:
@@ -162,19 +164,55 @@ async def init_db() -> None:
         try:
             async with engine.begin() as conn:
                 await conn.execute(text('CREATE EXTENSION IF NOT EXISTS vector'))
-                print("✅ Extensão vector criada/verificada")
+                # Verificar se realmente está disponível
+                result = await conn.execute(text("SELECT 1 FROM pg_type WHERE typname = 'vector'"))
+                if result.scalar():
+                    vector_available = True
+                    print("✅ Extensão vector criada/verificada")
+                else:
+                    print("⚠️ Extensão vector criada mas tipo não encontrado")
         except Exception as e:
             error_str = str(e).lower()
             if "vector" in error_str or "extension" in error_str or "not available" in error_str:
                 print(f"⚠️ Extensão vector não disponível (normal no Railway sem pgvector)")
                 print("💡 A aplicação continuará sem suporte a embeddings vetoriais")
+                vector_available = False
             else:
                 print(f"⚠️ Aviso ao criar extensão vector: {e}")
+                vector_available = False
         
-        # Criar tabelas em transação separada e limpa
+        # Criar tabelas - filtrar modelos que dependem de VECTOR se não estiver disponível
         async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-            print("✅ Tabelas criadas/verificadas")
+            if vector_available:
+                # Criar todas as tabelas
+                await conn.run_sync(Base.metadata.create_all)
+                print("✅ Tabelas criadas/verificadas (incluindo embeddings)")
+            else:
+                # Criar apenas tabelas que não dependem de VECTOR
+                from app.models import (
+                    User, Note, Document, Conversation, Message,
+                    OfficialDocument, Calendar, CalendarEvent, Gem, GemDocument
+                )
+                # Criar tabelas básicas
+                tables_to_create = [
+                    User.__table__,
+                    Note.__table__,
+                    Document.__table__,
+                    Conversation.__table__,
+                    Message.__table__,
+                    OfficialDocument.__table__,
+                    Calendar.__table__,
+                    CalendarEvent.__table__,
+                    Gem.__table__,
+                    GemDocument.__table__,
+                ]
+                for table in tables_to_create:
+                    try:
+                        await conn.run_sync(lambda sync_conn: table.create(sync_conn, checkfirst=True))
+                    except Exception as e:
+                        print(f"⚠️ Aviso ao criar tabela {table.name}: {e}")
+                print("✅ Tabelas básicas criadas/verificadas (sem embeddings)")
+                print("💡 Tabelas de embeddings serão ignoradas (pgvector não disponível)")
     except Exception as e:
         print(f"❌ Erro ao inicializar banco: {e}")
         raise
