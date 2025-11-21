@@ -1,15 +1,33 @@
 """Configuração do banco de dados PostgreSQL com SQLAlchemy."""
 
 from typing import AsyncGenerator
+import os
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
 from .settings import settings
 
+
+def get_database_url() -> str:
+    """
+    Obtém a URL do banco de dados, convertendo se necessário.
+    
+    Railway fornece DATABASE_URL no formato postgresql://
+    mas precisamos postgresql+asyncpg:// para asyncpg.
+    """
+    db_url = settings.database_url
+    
+    # Se for do Railway (postgresql://), converter para asyncpg
+    if db_url.startswith("postgresql://") and "+asyncpg" not in db_url:
+        db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    
+    return db_url
+
+
 # Engine assíncrono do SQLAlchemy
 engine = create_async_engine(
-    settings.database_url,
+    get_database_url(),
     echo=settings.debug,
     future=True,
     pool_pre_ping=True,
@@ -52,12 +70,23 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_db() -> None:
-    """Inicializa o banco de dados criando todas as tabelas."""
+    """Inicializa o banco de dados criando todas as tabelas e extensões."""
+    from sqlalchemy import text
+    
     async with engine.begin() as conn:
+        # Criar extensões necessárias
+        try:
+            await conn.execute(text('CREATE EXTENSION IF NOT EXISTS vector'))
+            await conn.execute(text('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"'))
+            print("✅ Extensões PostgreSQL criadas")
+        except Exception as e:
+            print(f"⚠️ Aviso ao criar extensões (podem já existir): {e}")
+        
+        # Criar tabelas
         await conn.run_sync(Base.metadata.create_all)
+        print("✅ Tabelas criadas")
 
 
 async def close_db() -> None:
     """Fecha as conexões do banco de dados."""
     await engine.dispose()
-
