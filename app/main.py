@@ -77,6 +77,23 @@ def create_application() -> FastAPI:
         redoc_url="/redoc" if enable_docs else None,
     )
 
+    # Middleware para forçar HTTPS em redirects
+    @app.middleware("http")
+    async def force_https_redirects(request: Request, call_next):
+        """Middleware para forçar HTTPS em redirects e corrigir URLs."""
+        response = await call_next(request)
+        
+        # Se for um redirect (3xx), garantir que use HTTPS
+        if 300 <= response.status_code < 400:
+            location = response.headers.get("location")
+            if location and location.startswith("http://"):
+                # Converter HTTP para HTTPS
+                https_location = location.replace("http://", "https://")
+                response.headers["location"] = https_location
+                print(f"🔒 [HTTPS] Convertido redirect HTTP → HTTPS: {location} → {https_location}")
+        
+        return response
+    
     # Middleware de logging para debug
     @app.middleware("http")
     async def log_requests(request: Request, call_next):
