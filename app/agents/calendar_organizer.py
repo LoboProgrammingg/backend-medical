@@ -214,14 +214,27 @@ Seja objetiva e baseada em boas práticas médicas."""
 - Nome: {name}
 - Posição na lista: {position}
 
-**ESTRUTURA DO DOCUMENTO:**
-O documento pode ter esta estrutura:
-1. Seção "GRUPOS" no topo (lista de pessoas por grupo)
-2. Para cada semana (Semana 1, Semana 2, etc.):
-   - Tabela "MAPA RECEPTOR" com colunas: LOCAL | SETOR | HORÁRIO | PRINCIPAL RESPONSÁVEL | SEGUNDA | TERÇA | QUARTA | QUINTA | SEXTA | SÁBADO | DOMINGO
-   - Linha de datas abaixo dos dias: DD/MM para cada dia
-   - Tabela "PLANTÃO" com colunas: PLANTÃO | SEGUNDA | TERÇA | QUARTA | QUINTA | SEXTA | SÁBADO | DOMINGO
-   - Os plantões aparecem na tabela "PLANTÃO" com códigos como ({group_number}) {position} na COLUNA do dia correspondente
+**ESTRUTURA EXATA DO DOCUMENTO:**
+O documento tem esta estrutura específica (como planilha):
+
+1. **SEÇÃO "GRUPOS" (topo):**
+   - Lista de pessoas organizadas por colunas numeradas (1, 2, 3, 4, 5, 6, 7, 8)
+   - Cada pessoa tem um código (ex: A1, B2, C3, etc.)
+
+2. **PARA CADA SEMANA (Semana 1, Semana 2, etc.):**
+   
+   **a) TABELA "MAPA RECEPTOR":**
+   - Colunas: LOCAL | SETOR | HORÁRIO | PRINCIPAL RESPONSÁVEL | SEGUNDA | TERÇA | QUARTA | QUINTA | SEXTA | SÁBADO | DOMINGO
+   - Linha de DATAS: Abaixo dos cabeçalhos dos dias, há uma linha com datas DD/MM para cada dia
+   - Cada linha representa um turno de trabalho normal
+   - Os números nas colunas dos dias (ex: 1, 2, 3, 7, 8) referem-se aos grupos
+   
+   **b) TABELA "PLANTÃO":**
+   - Colunas: PLANTÃO | SEGUNDA | TERÇA | QUARTA | QUINTA | SEXTA | SÁBADO | DOMINGO
+   - Cada linha representa um plantão
+   - Os plantões aparecem com códigos como ({group_number}) {position} (ex: (7) A1) na COLUNA do dia correspondente
+   - **CRÍTICO:** O dia da semana do plantão é determinado pela COLUNA onde o código aparece, não pelo texto ao redor!
+   - Exemplo: Se (7) A1 aparece na coluna "DOMINGO", então day_of_week = "Dom", mesmo que o texto mostre outra coisa antes
 
 **TEXTO DO DOCUMENTO (PDF ou Excel extraído):**
 {pdf_text[:15000]}  # Limitar para reduzir tempo de processamento
@@ -246,25 +259,42 @@ O documento pode ter esta estrutura:
    
    **REGRA FUNDAMENTAL:** O dia da semana do plantão é determinado pela COLUNA onde ele aparece no PDF, NÃO pelo dia que vem antes dele no texto!
    
-   **PROCESSO OBRIGATÓRIO:**
-   1. Procurar APENAS onde aparece ({group_number}) {position} ou ({group_number}){position}
-   2. IDENTIFICAR A COLUNA: Verificar em qual COLUNA/DIA DA SEMANA o plantão aparece:
-      - Se está na coluna "Segunda" ou "Seg", day_of_week = "Seg"
-      - Se está na coluna "Terça" ou "Ter", day_of_week = "Ter"
-      - Se está na coluna "Quarta" ou "Qua", day_of_week = "Qua"
-      - Se está na coluna "Quinta" ou "Qui", day_of_week = "Qui"
-      - Se está na coluna "Sexta" ou "Sex", day_of_week = "Sex"
-      - Se está na coluna "Sábado" ou "Sáb", day_of_week = "Sáb"
-      - Se está na coluna "Domingo" ou "Dom", day_of_week = "Dom"
+   **PROCESSO OBRIGATÓRIO PARA PLANTÕES:**
    
-   3. IDENTIFICAR A DATA: Procurar pela data DD/MM na MESMA LINHA ou LINHA PRÓXIMA do plantão
-   4. EXTRAIR APENAS DD/MM - NÃO tentar adivinhar o ano!
+   1. **PROCURAR NA TABELA "PLANTÃO":**
+      - Procurar APENAS na tabela "PLANTÃO" (não na tabela "MAPA RECEPTOR")
+      - Procurar APENAS onde aparece ({group_number}) {position} ou ({group_number}){position}
+      - Exemplo: Se grupo=7 e posição=A1, procurar por "(7) A1" ou "(7)A1"
    
-   **ATENÇÃO CRÍTICA:**
-   - O plantão pode aparecer DEPOIS de um dia de trabalho no texto, mas o day_of_week é da COLUNA onde está!
-   - Exemplo: Se o texto mostra "Terça | Trabalho | ... | Plantão", mas o plantão está na COLUNA "Domingo", então day_of_week = "Dom"!
+   2. **IDENTIFICAR A COLUNA (CRÍTICO):**
+      - O documento está estruturado como PLANILHA com colunas para cada dia
+      - Verificar em qual COLUNA o código ({group_number}) {position} aparece:
+        - Se está na coluna "SEGUNDA" ou "Segunda" ou "Seg", day_of_week = "Seg"
+        - Se está na coluna "TERÇA" ou "Terça" ou "Ter", day_of_week = "Ter"
+        - Se está na coluna "QUARTA" ou "Quarta" ou "Qua", day_of_week = "Qua"
+        - Se está na coluna "QUINTA" ou "Quinta" ou "Qui", day_of_week = "Qui"
+        - Se está na coluna "SEXTA" ou "Sexta" ou "Sex", day_of_week = "Sex"
+        - Se está na coluna "SÁBADO" ou "Sábado" ou "Sáb", day_of_week = "Sáb"
+        - Se está na coluna "DOMINGO" ou "Domingo" ou "Dom", day_of_week = "Dom"
+   
+   3. **IDENTIFICAR A DATA:**
+      - Procurar pela data DD/MM na linha de datas da semana correspondente
+      - A data está na mesma coluna do plantão
+      - Exemplo: Se o plantão está na coluna "DOMINGO" da Semana 2, procurar a data na linha de datas da Semana 2, coluna "DOMINGO"
+      - EXTRAIR APENAS DD/MM - NÃO tentar adivinhar o ano!
+   
+   4. **EXTRAIR INFORMAÇÕES DO PLANTÃO:**
+      - Local: Na mesma linha do plantão, coluna "LOCAL" ou primeira coluna
+      - Tipo: "Plantão Cinderela", "Plantão Diurno", "Plantão Noturno", etc.
+      - Horário: Na mesma linha, coluna "HORÁRIO"
+   
+   **ATENÇÃO CRÍTICA - NÃO ERRAR O DIA:**
+   - O plantão está na TABELA "PLANTÃO", não na "MAPA RECEPTOR"
+   - O day_of_week é determinado pela COLUNA onde o código aparece, NÃO pelo texto ao redor!
+   - Exemplo: Se o texto mostra "Terça | Trabalho | ... | (7) A1", mas (7) A1 está na COLUNA "DOMINGO" da tabela PLANTÃO, então day_of_week = "Dom"!
    - NUNCA assuma que o plantão é do mesmo dia que aparece antes dele no texto!
-   - SEMPRE verifique a estrutura de colunas do PDF/planilha!
+   - SEMPRE verifique a estrutura de colunas da planilha!
+   - Se o documento está estruturado como "Linha X: Col1 | Col2 | ... | ColDom", e (7) A1 está em ColDom, então é Domingo!
    
    - Extrair local, tipo de plantão, horários
    - Confirmar que é realmente um plantão
