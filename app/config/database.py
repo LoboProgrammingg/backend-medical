@@ -68,10 +68,14 @@ def get_database_url() -> str:
             print("⚠️ Usando DATABASE_PUBLIC_URL (pública) - pode gerar custos de egress")
             print("💡 Considere usar DATABASE_URL (privada) para evitar custos")
     
-    # Se for do Railway (postgresql://), converter para asyncpg
-    if db_url.startswith("postgresql://") and "+asyncpg" not in db_url:
+    # Converter para formato asyncpg
+    # Railway pode fornecer postgres:// ou postgresql://
+    if db_url.startswith("postgres://") and "+asyncpg" not in db_url:
+        db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
+        print("✅ URL convertida de postgres:// para postgresql+asyncpg://")
+    elif db_url.startswith("postgresql://") and "+asyncpg" not in db_url:
         db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
-        print("✅ URL convertida para asyncpg")
+        print("✅ URL convertida de postgresql:// para postgresql+asyncpg://")
     
     return db_url
 
