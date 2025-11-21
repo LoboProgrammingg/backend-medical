@@ -20,8 +20,8 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Instalar Poetry
-RUN pip install poetry==1.7.1
+# Instalar Poetry (versão mais recente)
+RUN pip install poetry
 
 # Copiar arquivos de dependências
 COPY pyproject.toml ./
@@ -30,7 +30,8 @@ COPY poetry.lock* ./
 
 # Configurar Poetry e instalar dependências
 RUN poetry config virtualenvs.create false \
-    && poetry install --no-interaction --no-ansi --only main
+    && poetry config installer.max-workers 10 \
+    && poetry install --no-interaction --no-ansi --only main --no-root
 
 # Copiar código da aplicação
 COPY . .
