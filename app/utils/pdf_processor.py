@@ -18,6 +18,362 @@ class PDFProcessor:
     """Processador de PDFs para converter em anotações."""
 
     @staticmethod
+    def extract_structured_calendar_text(pdf_path: Path) -> str:
+        """
+        Extrai texto ESTRUTURADO de um PDF de calendário que está formatado como PLANILHA.
+        
+        Trata o PDF como uma planilha Excel, mantendo:
+        - Estrutura de células e colunas
+        - Alinhamento horizontal e vertical
+        - Relação entre linhas e colunas
+        - Organização por semanas e dias
+        
+        Args:
+            pdf_path: Caminho para o arquivo PDF.
+            
+        Returns:
+            str: Texto estruturado como planilha, bem organizado.
+        """
+        try:
+            print(f"📅 Extraindo calendário estruturado (como PLANILHA) de: {pdf_path.name}")
+            
+            structured_parts = []
+            
+            # Usar pdfplumber para tratar como planilha
+            with pdfplumber.open(str(pdf_path)) as pdf:
+                for page_num, page in enumerate(pdf.pages, 1):
+                    print(f"   📄 Processando página {page_num} como planilha...")
+                    
+                    # ESTRATÉGIA PRINCIPAL: Extrair como tabela/planilha
+                    # Configurações otimizadas para planilhas
+                    tables = page.extract_tables(
+                        table_settings={
+                            "vertical_strategy": "lines",  # Usar linhas verticais
+                            "horizontal_strategy": "lines",  # Usar linhas horizontais
+                            "explicit_vertical_lines": [],
+                            "explicit_horizontal_lines": [],
+                            "snap_tolerance": 5,  # Tolerância para alinhamento
+                            "join_tolerance": 3,  # Tolerância para juntar células
+                            "edge_tolerance": 3,  # Tolerância para bordas
+                            "min_words_vertical": 1,  # Mínimo de palavras para coluna
+                            "min_words_horizontal": 1,  # Mínimo de palavras para linha
+                        }
+                    )
+                    
+                    if tables:
+                        print(f"      ✅ {len(tables)} tabela(s)/planilha(s) encontrada(s)")
+                        for table_num, table in enumerate(tables, 1):
+                            structured_parts.append(f"\n{'='*100}")
+                            structured_parts.append(f"PLANILHA {table_num} - PÁGINA {page_num}")
+                            structured_parts.append(f"{'='*100}\n")
+                            
+                            # Processar cada linha mantendo estrutura de colunas
+                            for row_num, row in enumerate(table, 1):
+                                if row:  # Linha não vazia
+                                    # Processar células mantendo estrutura
+                                    processed_cells = []
+                                    for col_num, cell in enumerate(row, 1):
+                                        if cell:
+                                            cell_text = str(cell).strip()
+                                            # Limpar quebras de linha e espaços múltiplos
+                                            cell_text = re.sub(r'\s+', ' ', cell_text)
+                                            # Manter célula mesmo se vazia (para manter estrutura)
+                                            processed_cells.append(cell_text if cell_text else "")
+                                        else:
+                                            processed_cells.append("")  # Célula vazia
+                                    
+                                    # Juntar células com " | " para manter estrutura de colunas
+                                    # Isso é CRÍTICO para a IA entender que são colunas diferentes
+                                    row_text = " | ".join(processed_cells)
+                                    
+                                    # Adicionar número da linha para referência
+                                    if row_text.strip():
+                                        structured_parts.append(f"Linha {row_num:3d}: {row_text}")
+                            
+                            structured_parts.append("\n")
+                    
+                    # ESTRATÉGIA ALTERNATIVA: Se não encontrou tabelas, usar extração por palavras
+                    # com agrupamento por posição (simula células de planilha)
+                    if not tables or len(tables) == 0:
+                        print(f"      📝 Extraindo como planilha por posição de palavras...")
+                        
+                        # Extrair palavras com posições precisas
+                        words = page.extract_words(
+                            x_tolerance=2,
+                            y_tolerance=2,
+                            keep_blank_chars=False,
+                        )
+                        
+                        if words:
+                            # Agrupar palavras por linha (Y similar) e depois por coluna (X similar)
+                            lines_dict = {}
+                            for word in words:
+                                # Arredondar Y para agrupar linhas
+                                y = round(word['top'] / 2) * 2
+                                if y not in lines_dict:
+                                    lines_dict[y] = []
+                                lines_dict[y].append(word)
+                            
+                            # Processar cada linha
+                            for y in sorted(lines_dict.keys()):
+                                line_words = sorted(lines_dict[y], key=lambda w: w['x0'])
+                                
+                                # Agrupar palavras por coluna (X similar)
+                                columns = []
+                                current_col = []
+                                prev_x = None
+                                
+                                for word in line_words:
+                                    x = round(word['x0'] / 10) * 10  # Agrupar por X aproximado
+                                    
+                                    if prev_x is None or abs(x - prev_x) < 20:
+                                        # Mesma coluna
+                                        current_col.append(word['text'])
+                                    else:
+                                        # Nova coluna
+                                        if current_col:
+                                            columns.append(" ".join(current_col))
+                                        current_col = [word['text']]
+                                    
+                                    prev_x = x
+                                
+                                if current_col:
+                                    columns.append(" ".join(current_col))
+                                
+                                # Juntar colunas com " | " para manter estrutura
+                                if columns:
+                                    line_text = " | ".join(columns)
+                                    if line_text.strip():
+                                        structured_parts.append(line_text)
+                    
+                    # ESTRATÉGIA FALLBACK: Texto normal organizado
+                    if not structured_parts or len(structured_parts) < 10:
+                        text = page.extract_text()
+                        if text and text.strip():
+                            lines = text.split('\n')
+                            for line in lines:
+                                line = line.strip()
+                                if line and len(line) > 2:
+                                    structured_parts.append(line)
+            
+            # Juntar tudo
+            full_text = "\n".join(structured_parts)
+            
+            # PÓS-PROCESSAMENTO: Organizar melhor o texto estruturado
+            # 1. Identificar e marcar semanas (padrões comuns)
+            full_text = re.sub(
+                r'(?i)(semana\s*\d+|Semana\s*\d+|SEMANA\s*\d+)',
+                r'\n\n' + '='*80 + '\n### \1 ###\n' + '='*80 + '\n',
+                full_text
+            )
+            
+            # 2. Identificar dias da semana (com destaque)
+            full_text = re.sub(
+                r'(?i)\b(Segunda|Terça|Quarta|Quinta|Sexta|Sábado|Domingo|Seg|Ter|Qua|Qui|Sex|Sáb|Dom)\b',
+                r'\n--- \1 ---\n',
+                full_text
+            )
+            
+            # 3. Identificar plantões (com destaque especial)
+            full_text = re.sub(
+                r'(?i)(plantão|plantao|Plantão|PLANTÃO)',
+                r'\n>>> 🚨 \1 🚨 <<<\n',
+                full_text
+            )
+            
+            # 4. Identificar preceptores
+            full_text = re.sub(
+                r'(?i)(preceptor|Preceptor|PRECEPTOR)',
+                r'\n👨‍⚕️ \1',
+                full_text
+            )
+            
+            # 5. Limpar espaços extras mas manter estrutura
+            full_text = re.sub(r'\n{4,}', '\n\n\n', full_text)  # Máximo 3 quebras
+            full_text = re.sub(r' {3,}', ' ', full_text)  # Múltiplos espaços viram um
+            full_text = re.sub(r'\n +', '\n', full_text)  # Espaços no início de linha
+            
+            # 6. Remover linhas completamente vazias duplicadas
+            lines = full_text.split('\n')
+            cleaned_lines = []
+            prev_empty = False
+            for line in lines:
+                is_empty = not line.strip()
+                if not (is_empty and prev_empty):
+                    cleaned_lines.append(line)
+                prev_empty = is_empty
+            full_text = '\n'.join(cleaned_lines)
+            
+            print(f"✅ Calendário estruturado (planilha) extraído: {len(full_text)} caracteres")
+            print(f"   📊 Estrutura: {full_text.count('PLANILHA')} planilhas, {full_text.count('Semana')} semanas, {full_text.count('|')} separadores de coluna")
+            
+            return full_text.strip()
+            
+        except Exception as e:
+            print(f"❌ Erro ao extrair calendário estruturado: {e}")
+            import traceback
+            traceback.print_exc()
+            # Fallback para extração simples
+            print("⚠️ Usando extração simples como fallback...")
+            return PDFProcessor.extract_text_from_pdf(pdf_path)
+        """
+        Extrai texto ESTRUTURADO de um PDF de calendário médico, organizando tabelas e dados.
+        
+        Esta função é específica para calendários médicos e:
+        1. Extrai tabelas mantendo estrutura de colunas
+        2. Organiza por semanas e dias da semana
+        3. Identifica plantões, turnos e preceptores
+        4. Mantém alinhamento e estrutura visual
+        
+        Args:
+            pdf_path: Caminho para o arquivo PDF.
+            
+        Returns:
+            str: Texto estruturado do calendário, bem organizado.
+        """
+        try:
+            print(f"📅 Extraindo calendário estruturado de: {pdf_path.name}")
+            
+            structured_parts = []
+            
+            # Usar pdfplumber para extrair tabelas e texto estruturado
+            with pdfplumber.open(str(pdf_path)) as pdf:
+                for page_num, page in enumerate(pdf.pages, 1):
+                    print(f"   📄 Processando página {page_num}...")
+                    
+                    # ESTRATÉGIA 1: Tentar extrair tabelas estruturadas
+                    tables = page.extract_tables(
+                        table_settings={
+                            "vertical_strategy": "lines_strict",  # Usar linhas explícitas
+                            "horizontal_strategy": "lines_strict",
+                            "explicit_vertical_lines": [],
+                            "explicit_horizontal_lines": [],
+                            "snap_tolerance": 3,
+                            "join_tolerance": 3,
+                        }
+                    )
+                    
+                    if tables:
+                        print(f"      ✅ {len(tables)} tabela(s) encontrada(s)")
+                        for table_num, table in enumerate(tables, 1):
+                            structured_parts.append(f"\n{'='*80}")
+                            structured_parts.append(f"TABELA {table_num} - PÁGINA {page_num}")
+                            structured_parts.append(f"{'='*80}\n")
+                            
+                            # Processar cada linha da tabela mantendo estrutura
+                            for row_num, row in enumerate(table, 1):
+                                if row:  # Linha não vazia
+                                    # Limpar e processar células
+                                    clean_row = []
+                                    for cell in row:
+                                        if cell:
+                                            cell_text = str(cell).strip()
+                                            # Remover quebras de linha dentro da célula
+                                            cell_text = re.sub(r'\s+', ' ', cell_text)
+                                            if cell_text:
+                                                clean_row.append(cell_text)
+                                    
+                                    if clean_row:
+                                        # Juntar células com " | " para manter estrutura de colunas
+                                        # Isso ajuda a IA a entender que são colunas diferentes
+                                        row_text = " | ".join(clean_row)
+                                        structured_parts.append(row_text)
+                            
+                            structured_parts.append("\n")  # Espaço entre tabelas
+                    
+                    # ESTRATÉGIA 2: Se não encontrou tabelas ou para complementar, usar extração por palavras
+                    # Isso ajuda a manter ordem e posicionamento
+                    if not tables or len(tables) == 0:
+                        print(f"      📝 Extraindo texto estruturado por posição...")
+                        
+                        # Extrair palavras com posições
+                        words = page.extract_words(
+                            x_tolerance=3,
+                            y_tolerance=3,
+                        )
+                        
+                        if words:
+                            # Agrupar palavras por linha (Y similar)
+                            lines_dict = {}
+                            for word in words:
+                                y = round(word['top'] / 5) * 5  # Agrupar por Y aproximado
+                                if y not in lines_dict:
+                                    lines_dict[y] = []
+                                lines_dict[y].append(word)
+                            
+                            # Ordenar linhas por Y (de cima para baixo)
+                            for y in sorted(lines_dict.keys()):
+                                line_words = sorted(lines_dict[y], key=lambda w: w['x0'])
+                                line_text = " ".join([w['text'] for w in line_words])
+                                if line_text.strip():
+                                    structured_parts.append(line_text)
+                    
+                    # ESTRATÉGIA 3: Extrair texto normal como fallback
+                    text = page.extract_text()
+                    if text and text.strip():
+                        # Se não encontrou tabelas, usar texto normal organizado
+                        if not tables:
+                            lines = text.split('\n')
+                            for line in lines:
+                                line = line.strip()
+                                if line and len(line) > 2:  # Ignorar linhas muito curtas
+                                    structured_parts.append(line)
+            
+            # Juntar tudo
+            full_text = "\n".join(structured_parts)
+            
+            # PÓS-PROCESSAMENTO: Organizar melhor o texto
+            # 1. Identificar e marcar semanas
+            full_text = re.sub(
+                r'(?i)(semana\s*\d+|Semana\s*\d+)',
+                r'\n\n### \1 ###\n',
+                full_text
+            )
+            
+            # 2. Identificar dias da semana
+            full_text = re.sub(
+                r'(?i)\b(Segunda|Terça|Quarta|Quinta|Sexta|Sábado|Domingo|Seg|Ter|Qua|Qui|Sex|Sáb|Dom)\b',
+                r'\n--- \1 ---\n',
+                full_text
+            )
+            
+            # 3. Identificar plantões (padrões comuns)
+            full_text = re.sub(
+                r'(?i)(plantão|plantao|Plantão)',
+                r'\n>>> \1 <<<\n',
+                full_text
+            )
+            
+            # 4. Limpar espaços extras mas manter estrutura
+            full_text = re.sub(r'\n{4,}', '\n\n\n', full_text)  # Máximo 3 quebras
+            full_text = re.sub(r' {3,}', ' ', full_text)  # Múltiplos espaços viram um
+            full_text = re.sub(r'\n +', '\n', full_text)  # Espaços no início de linha
+            
+            # 5. Remover linhas completamente vazias duplicadas
+            lines = full_text.split('\n')
+            cleaned_lines = []
+            prev_empty = False
+            for line in lines:
+                is_empty = not line.strip()
+                if not (is_empty and prev_empty):
+                    cleaned_lines.append(line)
+                prev_empty = is_empty
+            full_text = '\n'.join(cleaned_lines)
+            
+            print(f"✅ Calendário estruturado extraído: {len(full_text)} caracteres")
+            print(f"   📊 Estrutura: {full_text.count('TABELA')} tabelas, {full_text.count('Semana')} semanas identificadas")
+            
+            return full_text.strip()
+            
+        except Exception as e:
+            print(f"❌ Erro ao extrair calendário estruturado: {e}")
+            import traceback
+            traceback.print_exc()
+            # Fallback para extração simples
+            print("⚠️ Usando extração simples como fallback...")
+            return PDFProcessor.extract_text_from_pdf(pdf_path)
+
+    @staticmethod
     def extract_text_from_pdf(pdf_path: Path) -> str:
         """
         Extrai texto SIMPLES de um PDF apenas para embeddings (RAG).
