@@ -47,7 +47,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8001/health || exit 1
 
 # Comando para iniciar a aplicação
-# Railway define $PORT automaticamente, usamos ela diretamente
-# Se não estiver definida, usa 8001 como fallback
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8001}
+# Railway define $PORT automaticamente (geralmente 8080)
+# Usa shell form para garantir expansão da variável
+CMD ["/bin/sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8001}"]
 
