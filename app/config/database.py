@@ -26,11 +26,19 @@ def get_database_url() -> str:
     # Railway fornece DATABASE_PUBLIC_URL para acesso externo
     # e DATABASE_URL para acesso interno
     # Preferimos DATABASE_PUBLIC_URL se disponível
-    db_url = os.getenv("DATABASE_PUBLIC_URL") or os.getenv("DATABASE_URL") or settings.database_url
+    db_url = os.getenv("DATABASE_PUBLIC_URL") or os.getenv("DATABASE_URL")
+    
+    # Se não encontrou nas variáveis de ambiente, usar settings
+    if not db_url:
+        db_url = settings.database_url
+        print("⚠️ Usando DATABASE_URL do settings (variável de ambiente não encontrada)")
+    else:
+        print(f"✅ DATABASE_URL encontrada nas variáveis de ambiente")
     
     # Se for do Railway (postgresql://), converter para asyncpg
     if db_url.startswith("postgresql://") and "+asyncpg" not in db_url:
         db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        print("✅ URL convertida para asyncpg")
     
     return db_url
 
