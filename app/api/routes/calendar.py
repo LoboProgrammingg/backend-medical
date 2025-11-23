@@ -134,6 +134,7 @@ async def upload_calendar(
         
         # Usar CalendarOrganizerAgent para extrair dados
         print(f"[CALENDAR-UPLOAD] Iniciando extração de dados com IA...")
+        print(f"[CALENDAR-UPLOAD] Parâmetros: grupo={group_number}, nome={name}, posição={position}")
         agent = CalendarOrganizerAgent()
         
         try:
@@ -146,7 +147,27 @@ async def upload_calendar(
                 ),
                 timeout=300.0  # 300 segundos (5 minutos) para processar com IA
             )
+            
+            # LOG DETALHADO DO QUE FOI RETORNADO
             print(f"[CALENDAR-UPLOAD] ✅ Dados extraídos pela IA")
+            print(f"[CALENDAR-UPLOAD] 📊 Estrutura retornada:")
+            print(f"   - Tipo: {type(calendar_data)}")
+            print(f"   - Keys: {list(calendar_data.keys()) if isinstance(calendar_data, dict) else 'N/A'}")
+            print(f"   - work_days: {len(calendar_data.get('work_days', []))} itens")
+            print(f"   - on_call_shifts: {len(calendar_data.get('on_call_shifts', []))} itens")
+            
+            if calendar_data.get('work_days'):
+                print(f"   - Primeiro work_day: {calendar_data['work_days'][0]}")
+            if calendar_data.get('on_call_shifts'):
+                print(f"   - Primeiro on_call_shift: {calendar_data['on_call_shifts'][0]}")
+            
+            # VALIDAÇÃO CRÍTICA: Verificar se há dados
+            if not calendar_data.get('work_days') and not calendar_data.get('on_call_shifts'):
+                print(f"[CALENDAR-UPLOAD] ⚠️⚠️⚠️ ATENÇÃO: IA retornou dados vazios!")
+                print(f"[CALENDAR-UPLOAD] 📄 Primeiros 2000 caracteres do texto enviado:")
+                print(calendar_text[:2000])
+                raise ValueError("A IA não extraiu nenhum dia de trabalho ou plantão. Verifique se o grupo, nome e posição estão corretos no documento.")
+            
         except asyncio.TimeoutError:
             raise HTTPException(
                 status_code=status.HTTP_408_REQUEST_TIMEOUT,
@@ -220,8 +241,21 @@ async def upload_calendar(
         # Criar eventos em batch (muito mais rápido)
         events_to_add = []
         
+        # LOG: Verificar dados antes de processar
+        work_days = calendar_data.get("work_days", [])
+        on_call_shifts = calendar_data.get("on_call_shifts", [])
+        print(f"[CALENDAR-UPLOAD] 📋 Processando eventos:")
+        print(f"   - work_days para processar: {len(work_days)}")
+        print(f"   - on_call_shifts para processar: {len(on_call_shifts)}")
+        
+        if work_days:
+            print(f"   - Primeiro work_day: {work_days[0]}")
+        if on_call_shifts:
+            print(f"   - Primeiro on_call_shift: {on_call_shifts[0]}")
+        
         # Processar dias de trabalho
-        for work_day in calendar_data.get("work_days", []):
+        for idx, work_day in enumerate(work_days):
+            print(f"[CALENDAR-UPLOAD] Processando work_day {idx + 1}/{len(work_days)}: {work_day.get('date')} - {work_day.get('day_of_week')}")
             event_date = parse_date_with_year(
                 work_day["date"], 
                 work_day.get("day_of_week"),
@@ -250,7 +284,8 @@ async def upload_calendar(
             ))
         
         # Processar plantões
-        for shift in calendar_data.get("on_call_shifts", []):
+        for idx, shift in enumerate(on_call_shifts):
+            print(f"[CALENDAR-UPLOAD] Processando on_call_shift {idx + 1}/{len(on_call_shifts)}: {shift.get('date')} - {shift.get('day_of_week')}")
             event_date = parse_date_with_year(
                 shift["date"],
                 shift.get("day_of_week"),
@@ -278,7 +313,20 @@ async def upload_calendar(
                 week_number=shift.get("week"),
             ))
         
+        # VALIDAÇÃO FINAL: Verificar se há eventos para adicionar
+        print(f"[CALENDAR-UPLOAD] 📊 Total de eventos criados: {len(events_to_add)}")
+        
+        if len(events_to_add) == 0:
+            print(f"[CALENDAR-UPLOAD] ⚠️⚠️⚠️ ERRO CRÍTICO: Nenhum evento foi criado!")
+            print(f"[CALENDAR-UPLOAD] 📄 Dados recebidos da IA:")
+            print(f"   - work_days: {len(work_days)}")
+            print(f"   - on_call_shifts: {len(on_call_shifts)}")
+            import json
+            print(f"   - calendar_data completo: {json.dumps(calendar_data, indent=2, ensure_ascii=False)[:2000]}")
+            raise ValueError("Nenhum evento foi extraído do calendário. Verifique se o grupo, nome e posição estão corretos no documento.")
+        
         # Adicionar todos os eventos de uma vez (batch insert)
+        print(f"[CALENDAR-UPLOAD] 💾 Salvando {len(events_to_add)} eventos no banco...")
         db.add_all(events_to_add)
         await db.commit()
         await db.refresh(calendar)
@@ -288,7 +336,7 @@ async def upload_calendar(
         await db.refresh(calendar, ["events"])
         events = calendar.events
         
-        print(f"[CALENDAR-UPLOAD] ✅ Calendário criado: {calendar.id} com {len(events)} eventos")
+        print(f"[CALENDAR-UPLOAD] ✅ Calendário criado: {calendar.id} com {len(events)} eventos salvos")
         
         return CalendarResponse(
             id=calendar.id,

@@ -61,7 +61,7 @@ class GemChatRequest(BaseModel):
     """Schema para chat com Gem."""
 
     message: str = Field(..., description="Mensagem do usuário")
-    gem_id: UUID = Field(..., description="ID da Gem a ser usada")
+    conversation_id: Optional[UUID] = Field(None, description="ID da conversa (opcional, cria nova se não fornecido)")
 
 
 class GemChatResponse(BaseModel):
@@ -70,5 +70,6 @@ class GemChatResponse(BaseModel):
     response: str
     gem_id: UUID
     gem_name: str
+    conversation_id: UUID
     sources_used: List[str] = []
 

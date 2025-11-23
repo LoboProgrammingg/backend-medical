@@ -26,40 +26,53 @@ class GemAgent(BaseAgent):
         Args:
             gem: Instância da Gem a ser usada.
         """
-        system_prompt = f"""Você é um ESPECIALISTA MÉDICO PROFISSIONAL com ANOS DE EXPERIÊNCIA e CONHECIMENTO PROFUNDO na sua área.
+        system_prompt = f"""Você é um ESPECIALISTA MÉDICO DE ELITE com DÉCADAS DE EXPERIÊNCIA e CONHECIMENTO EXCEPCIONAL na sua área.
 
 **ESPECIALIZAÇÃO: {gem.name}**
 
 **DESCRIÇÃO:**
-{gem.description or "Especialista médico com conhecimento profundo e anos de experiência"}
+{gem.description or "Especialista médico de elite com conhecimento profundo, anos de experiência e expertise reconhecida"}
 
 **INSTRUÇÕES PERSONALIZADAS:**
 {gem.instructions}
 
-**SUA IDENTIDADE COMO ESPECIALISTA:**
-- Você é um PROFISSIONAL com ANOS DE EXPERIÊNCIA na área de {gem.name}
-- Você possui CONHECIMENTO PROFUNDO e ATUALIZADO sobre sua especialidade
-- Você é capaz de responder perguntas complexas com base no seu conhecimento especializado
-- Você busca informações atualizadas quando necessário para fornecer respostas precisas
-- Você combina conhecimento geral da especialidade com informações específicas dos documentos fornecidos
+**SUA IDENTIDADE COMO ESPECIALISTA DE ELITE:**
+- Você é um PROFISSIONAL DE ELITE com DÉCADAS DE EXPERIÊNCIA na área de {gem.name}
+- Você possui CONHECIMENTO EXCEPCIONAL, ATUALIZADO e BASEADO EM EVIDÊNCIAS sobre sua especialidade
+- Você é reconhecido como AUTORIDADE na sua área, capaz de responder questões complexas e críticas
+- Você combina conhecimento teórico profundo com experiência prática extensa
+- Você busca constantemente informações atualizadas e baseadas em evidências científicas
+- Você integra perfeitamente conhecimento geral da especialidade com informações específicas dos documentos fornecidos
 
-**DIRETRIZES CRÍTICAS:**
-- Você é um ESPECIALISTA COMPLETO, não limitado apenas aos documentos
-- Use seu CONHECIMENTO PROFUNDO sobre {gem.name} para responder
-- Combine informações dos documentos com seu conhecimento especializado
-- BUSQUE informações atualizadas quando necessário para responder perfeitamente
-- Seja PRECISO, DIRETO e PROFISSIONAL em todas as respostas
-- Forneça respostas COMPLETAS e DETALHADAS como um especialista experiente
-- Cite fontes quando usar informações específicas dos documentos
-- Use conhecimento geral da especialidade quando apropriado
+**DIRETRIZES CRÍTICAS PARA EXCELÊNCIA:**
+- Você é um ESPECIALISTA COMPLETO e AUTORITÁRIO, não limitado apenas aos documentos
+- Use seu CONHECIMENTO EXCEPCIONAL sobre {gem.name} para fornecer respostas de ALTA QUALIDADE
+- Combine informações dos documentos com seu conhecimento especializado de forma INTELIGENTE e COERENTE
+- BUSQUE informações atualizadas e baseadas em evidências quando necessário
+- Seja EXTREMAMENTE PRECISO, DIRETO, COMPLETO e PROFISSIONAL em todas as respostas
+- Forneça respostas DETALHADAS, ESTRUTURADAS e BEM FUNDAMENTADAS como um especialista de elite
+- Cite fontes quando usar informações específicas dos documentos (formato: [Fonte: nome_arquivo])
+- Use conhecimento geral da especialidade quando apropriado, sempre baseado em evidências
+- Estruture respostas de forma CLARA e ORGANIZADA (use tópicos, listas, parágrafos bem definidos)
+- Priorize CLAREZA, PRECISÃO e COMPLETUDE em todas as respostas
+
+**FORMATO DE RESPOSTA PROFISSIONAL:**
+- Comece com uma resposta DIRETA e OBJETIVA à pergunta
+- Desenvolva o tema de forma ESTRUTURADA e LÓGICA
+- Use exemplos práticos quando relevante
+- Inclua informações complementares importantes
+- Finalize com um resumo ou conclusão quando apropriado
+- Cite fontes de forma clara e organizada
 
 **IMPORTANTE:**
-- Você é um ESPECIALISTA PROFISSIONAL, não apenas um sistema de busca em documentos
-- Use seu conhecimento especializado para responder como um médico experiente
-- Busque informações atualizadas quando necessário para fornecer a melhor resposta
-- Sempre siga o padrão e metodologia definidos nas suas instruções personalizadas
+- Você é um ESPECIALISTA DE ELITE, não apenas um sistema de busca em documentos
+- Use seu conhecimento especializado para responder como um médico experiente e reconhecido
+- Busque informações atualizadas quando necessário para fornecer a MELHOR resposta possível
+- Sempre siga RIGOROSAMENTE o padrão e metodologia definidos nas suas instruções personalizadas
 - Mantenha consistência com o estilo e abordagem especificados
-- Priorize ser um ESPECIALISTA COMPLETO sobre ser limitado a documentos"""
+- Priorize QUALIDADE, PRECISÃO e COMPLETUDE sobre brevidade
+- Seja PROATIVO em fornecer informações complementares relevantes
+- Demonstre PROFUNDIDADE DE CONHECIMENTO em todas as respostas"""
         
         super().__init__(
             name=f"Gem: {gem.name}",
@@ -91,37 +104,94 @@ class GemAgent(BaseAgent):
         message: str,
         user_id: UUID,
         db: AsyncSession,
+        conversation_id: UUID | None = None,
     ) -> Dict[str, Any]:
         """
-        Responde usando a Gem com RAG dos documentos.
+        Responde usando a Gem com RAG dos documentos e histórico de conversas.
         
         Args:
             message: Mensagem do usuário.
             user_id: ID do usuário.
             db: Sessão do banco de dados.
+            conversation_id: ID da conversa (opcional, para recuperar histórico).
         
         Returns:
             Dict[str, Any]: Resposta com texto e fontes usadas.
         """
-        # Buscar contexto relevante nos documentos da Gem
+        # Recuperar histórico de conversas se conversation_id for fornecido
+        conversation_history = []
+        if conversation_id:
+            from app.models.gem import GemConversation, GemMessage
+            from sqlalchemy import select
+            
+            # Buscar conversa e mensagens
+            conv_query = select(GemConversation).where(
+                GemConversation.id == conversation_id,
+                GemConversation.gem_id == self.gem.id,
+                GemConversation.user_id == user_id,
+            )
+            conv_result = await db.execute(conv_query)
+            conversation = conv_result.scalar_one_or_none()
+            
+            if conversation:
+                # Buscar últimas mensagens (limitar a 20 para não exceder tokens)
+                messages_query = (
+                    select(GemMessage)
+                    .where(GemMessage.conversation_id == conversation_id)
+                    .order_by(GemMessage.created_at.desc())
+                    .limit(20)
+                )
+                messages_result = await db.execute(messages_query)
+                messages = messages_result.scalars().all()
+                
+                # Reverter ordem para ter do mais antigo ao mais recente
+                messages = list(reversed(messages))
+                
+                # Formatar histórico
+                for msg in messages:
+                    conversation_history.append({
+                        "role": msg.role,
+                        "content": msg.content,
+                    })
+                
+                print(f"[GEM-AGENT] 📜 Histórico recuperado: {len(conversation_history)} mensagens")
+        
+        # Buscar contexto relevante nos documentos da Gem (aumentado para mais contexto)
         relevant_chunks = await GemRAGService.search_gem_documents(
             query=message,
             gem_id=self.gem.id,
             db=db,
-            limit=5,
-            similarity_threshold=0.3,
+            limit=10,  # Mais chunks para contexto mais completo
+            similarity_threshold=0.25,  # Threshold mais baixo para capturar mais informações relevantes
         )
         
-        # Construir contexto dos documentos
+        print(f"[GEM-AGENT] 📚 Chunks relevantes encontrados: {len(relevant_chunks)}")
+        
+        # Construir contexto dos documentos de forma organizada
         context_parts = []
         sources_used = []
         
+        # Agrupar chunks por arquivo para melhor organização
+        chunks_by_file = {}
         for chunk in relevant_chunks:
-            context_parts.append(f"**Fonte: {chunk['filename']}**\n{chunk['chunk_text']}")
-            if chunk['filename'] not in sources_used:
-                sources_used.append(chunk['filename'])
+            filename = chunk['filename']
+            if filename not in chunks_by_file:
+                chunks_by_file[filename] = []
+            chunks_by_file[filename].append(chunk)
+        
+        # Construir contexto agrupado por arquivo
+        for filename, file_chunks in chunks_by_file.items():
+            file_context = f"**📄 FONTE: {filename}**\n\n"
+            for idx, chunk in enumerate(file_chunks, 1):
+                file_context += f"**Trecho {idx} (similaridade: {chunk['similarity']:.2%}):**\n{chunk['chunk_text']}\n\n"
+            context_parts.append(file_context.strip())
+            if filename not in sources_used:
+                sources_used.append(filename)
         
         context = "\n\n---\n\n".join(context_parts) if context_parts else None
+        
+        if context:
+            print(f"[GEM-AGENT] 📚 Contexto construído: {len(sources_used)} arquivos, {len(relevant_chunks)} chunks")
         
         # Buscar informações na web se necessário (sempre para garantir respostas completas)
         web_context = None
@@ -152,28 +222,64 @@ class GemAgent(BaseAgent):
 
 {web_context}""")
         
+        # Adicionar histórico de conversas se houver
+        if conversation_history:
+            history_text = "\n\n".join([
+                f"**{msg['role'].upper()}:** {msg['content']}"
+                for msg in conversation_history
+            ])
+            prompt_sections.append(f"""**HISTÓRICO DA CONVERSA (CONTEXTO ANTERIOR):
+
+{history_text}
+
+---
+**IMPORTANTE:** Use o histórico acima para manter continuidade e contexto da conversa. Referencie informações mencionadas anteriormente quando relevante.**""")
+        
         prompt_sections.append(f"""**PERGUNTA DO USUÁRIO:**
 {message}
 
-**RESPONDA COMO ESPECIALISTA:**
-- Você é um ESPECIALISTA PROFISSIONAL em {self.gem.name} com ANOS DE EXPERIÊNCIA
-- Use seu CONHECIMENTO PROFUNDO sobre a especialidade para responder
-- Combine informações dos documentos e da web com seu conhecimento especializado
-- Siga RIGOROSAMENTE suas instruções personalizadas definidas acima
-- Seja PRECISO, DIRETO, COMPLETO e PROFISSIONAL
-- Forneça uma resposta DETALHADA como um especialista experiente
-- Cite as fontes quando usar informações específicas
-- Use seu conhecimento geral da especialidade quando apropriado
-- BUSQUE sempre fornecer a MELHOR resposta possível como um profissional experiente""")
+**INSTRUÇÕES PARA SUA RESPOSTA (SEGUIR RIGOROSAMENTE):**
+1. **RESPONDA COMO ESPECIALISTA DE ELITE:**
+   - Você é um ESPECIALISTA DE ELITE em {self.gem.name} com DÉCADAS DE EXPERIÊNCIA
+   - Use seu CONHECIMENTO EXCEPCIONAL sobre a especialidade para fornecer uma resposta de ALTA QUALIDADE
+   - Demonstre PROFUNDIDADE e AUTORIDADE no assunto
+
+2. **ESTRUTURA E FORMATO:**
+   - Comece com uma resposta DIRETA e OBJETIVA à pergunta
+   - Desenvolva o tema de forma ESTRUTURADA, LÓGICA e ORGANIZADA
+   - Use tópicos, listas numeradas ou com marcadores quando apropriado
+   - Inclua exemplos práticos e casos clínicos quando relevante
+   - Finalize com um resumo ou conclusão quando apropriado
+
+3. **FONTES E INFORMAÇÕES:**
+   - Combine informações dos documentos e da web com seu conhecimento especializado
+   - Cite fontes de forma clara: [Fonte: nome_arquivo] ou [Fonte: URL]
+   - Use seu conhecimento geral da especialidade quando apropriado, sempre baseado em evidências
+   - Priorize informações dos documentos quando disponíveis e relevantes
+
+4. **QUALIDADE E PRECISÃO:**
+   - Siga RIGOROSAMENTE suas instruções personalizadas definidas acima
+   - Seja EXTREMAMENTE PRECISO, DIRETO, COMPLETO e PROFISSIONAL
+   - Forneça uma resposta DETALHADA, BEM FUNDAMENTADA e ESTRUTURADA
+   - Priorize QUALIDADE e COMPLETUDE sobre brevidade
+   - Seja PROATIVO em fornecer informações complementares relevantes
+
+5. **OBJETIVO FINAL:**
+   - BUSQUE sempre fornecer a MELHOR resposta possível como um especialista de elite
+   - A resposta deve ser útil, precisa, completa e profissional
+   - Demonstre expertise e autoridade no assunto
+   - Forneça valor real ao usuário com informações de alta qualidade""")
         
         full_prompt = "\n\n---\n\n".join(prompt_sections)
         
-        # Gerar resposta
+        # Gerar resposta com configuração otimizada para qualidade
         generation_config = {
-            "max_output_tokens": settings.max_output_tokens,
-            "top_k": settings.top_k,
-            "temperature": 0.7,
+            "max_output_tokens": settings.max_output_tokens,  # 25000 tokens para respostas completas
+            "top_k": settings.top_k,  # 55 para diversidade controlada
+            "temperature": 0.6,  # Reduzido de 0.7 para 0.6 para respostas mais precisas e focadas
         }
+        
+        print(f"[GEM-AGENT] 🤖 Gerando resposta com {len(relevant_chunks)} chunks de contexto...")
         
         model = genai.GenerativeModel(
             settings.gemini_model,
@@ -187,6 +293,7 @@ class GemAgent(BaseAgent):
             "response": response_text,
             "gem_id": str(self.gem.id),
             "gem_name": self.gem.name,
+            "conversation_id": str(conversation_id) if conversation_id else None,
             "sources_used": sources_used,
         }
 

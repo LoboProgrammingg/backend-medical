@@ -1,7 +1,7 @@
 """SQLAlchemy models."""
 
 from .calendar import Calendar, CalendarEvent
-from .gem import Gem, GemDocument, GemDocumentEmbedding
+from .gem import Gem, GemDocument, GemDocumentEmbedding, GemConversation, GemMessage
 from .conversation import Conversation
 from .document import Document
 from .document_embedding import DocumentEmbedding

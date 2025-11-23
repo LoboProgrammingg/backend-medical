@@ -504,6 +504,7 @@ Você DEVE retornar APENAS um JSON válido com esta estrutura:
                 
                 response_text = response.text.strip()
                 print(f"[CALENDAR-EXTRACT] Resposta recebida: {len(response_text)} caracteres")
+                print(f"[CALENDAR-EXTRACT] Primeiros 500 caracteres: {response_text[:500]}")
                 
                 # Limpar resposta (remover markdown code blocks se houver)
                 if "```json" in response_text:
@@ -512,16 +513,42 @@ Você DEVE retornar APENAS um JSON válido com esta estrutura:
                     response_text = response_text.split("```")[1].split("```")[0].strip()
                 
                 # Parsear JSON
-                calendar_data = json.loads(response_text)
+                try:
+                    calendar_data = json.loads(response_text)
+                except json.JSONDecodeError as e:
+                    print(f"[CALENDAR-EXTRACT] ❌ Erro ao parsear JSON: {e}")
+                    print(f"[CALENDAR-EXTRACT] Texto completo recebido:")
+                    print(response_text)
+                    raise
                 
                 # Validar estrutura
                 if not isinstance(calendar_data, dict):
+                    print(f"[CALENDAR-EXTRACT] ❌ Resposta não é um dicionário: {type(calendar_data)}")
                     raise ValueError("Resposta não é um dicionário")
                 
                 if "work_days" not in calendar_data:
+                    print(f"[CALENDAR-EXTRACT] ⚠️ 'work_days' não encontrado, criando lista vazia")
                     calendar_data["work_days"] = []
                 if "on_call_shifts" not in calendar_data:
+                    print(f"[CALENDAR-EXTRACT] ⚠️ 'on_call_shifts' não encontrado, criando lista vazia")
                     calendar_data["on_call_shifts"] = []
+                
+                # VALIDAÇÃO CRÍTICA: Verificar se há dados
+                work_days_count = len(calendar_data.get("work_days", []))
+                on_call_count = len(calendar_data.get("on_call_shifts", []))
+                
+                print(f"[CALENDAR-EXTRACT] 📊 Validação:")
+                print(f"   - work_days: {work_days_count} itens")
+                print(f"   - on_call_shifts: {on_call_count} itens")
+                print(f"   - group_number: {calendar_data.get('group_number')}")
+                print(f"   - name: {calendar_data.get('name')}")
+                print(f"   - position: {calendar_data.get('position')}")
+                
+                if work_days_count == 0 and on_call_count == 0:
+                    print(f"[CALENDAR-EXTRACT] ⚠️⚠️⚠️ ATENÇÃO: Nenhum evento extraído!")
+                    print(f"[CALENDAR-EXTRACT] 📄 Estrutura completa retornada:")
+                    print(json.dumps(calendar_data, indent=2, ensure_ascii=False)[:1000])
+                    # Não falhar aqui, apenas logar - pode ser que realmente não haja eventos
                 
                 return calendar_data
                 

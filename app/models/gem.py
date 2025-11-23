@@ -50,6 +50,9 @@ class Gem(Base):
     documents: Mapped[list["GemDocument"]] = relationship(
         "GemDocument", back_populates="gem", cascade="all, delete-orphan"
     )
+    conversations: Mapped[list["GemConversation"]] = relationship(
+        "GemConversation", back_populates="gem", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         """Representação string."""
@@ -134,4 +137,86 @@ class GemDocumentEmbedding(Base):
     def __repr__(self) -> str:
         """Representação string."""
         return f"<GemDocumentEmbedding(id={self.id}, document_id={self.document_id})>"
+
+
+class GemConversation(Base):
+    """Modelo de conversa com uma Gem específica."""
+
+    __tablename__ = "gem_conversations"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    gem_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("gems.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    
+    # Título da conversa (gerado automaticamente ou definido pelo usuário)
+    title: Mapped[str] = mapped_column(String(200), nullable=False, default="Nova Conversa")
+    
+    # Metadata
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    # Relacionamentos
+    gem: Mapped["Gem"] = relationship("Gem", back_populates="conversations")
+    messages: Mapped[list["GemMessage"]] = relationship(
+        "GemMessage", back_populates="conversation", cascade="all, delete-orphan", order_by="GemMessage.created_at"
+    )
+
+    def __repr__(self) -> str:
+        """Representação string."""
+        return f"<GemConversation(id={self.id}, gem_id={self.gem_id}, title={self.title})>"
+
+
+class GemMessage(Base):
+    """Modelo de mensagem em uma conversa com Gem."""
+
+    __tablename__ = "gem_messages"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("gem_conversations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    
+    # Role: 'user' ou 'assistant'
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+    
+    # Conteúdo da mensagem
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    
+    # Metadata
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    # Relacionamento
+    conversation: Mapped["GemConversation"] = relationship(
+        "GemConversation", back_populates="messages"
+    )
+
+    def __repr__(self) -> str:
+        """Representação string."""
+        return f"<GemMessage(id={self.id}, role={self.role}, content={self.content[:50]}...)>"
 

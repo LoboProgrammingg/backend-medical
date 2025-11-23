@@ -46,44 +46,62 @@ class GemRAGService:
             file_path
         )
         
-        if not pdf_text or len(pdf_text) < 100:
-            print(f"[GEM-RAG] ⚠️ PDF muito pequeno ou vazio")
-            return
+        if not pdf_text or len(pdf_text.strip()) < 100:
+            print(f"[GEM-RAG] ⚠️ PDF muito pequeno ou vazio ({len(pdf_text) if pdf_text else 0} caracteres)")
+            raise ValueError(f"PDF muito pequeno ou vazio. Mínimo necessário: 100 caracteres")
         
-        # Chunking inteligente (3000 caracteres com overlap de 200)
-        chunks = PDFProcessor.chunk_text(pdf_text, chunk_size=3000, overlap=200)
+        # Chunking melhorado para GEMs (5000 caracteres com overlap de 500 para melhor contexto)
+        # Chunks maiores preservam melhor o contexto médico
+        chunks = PDFProcessor.chunk_text(pdf_text, chunk_size=5000, overlap=500)
         
-        print(f"[GEM-RAG] ✅ PDF extraído: {len(pdf_text)} caracteres, {len(chunks)} chunks")
+        print(f"[GEM-RAG] ✅ PDF extraído: {len(pdf_text):,} caracteres, {len(chunks)} chunks")
+        print(f"[GEM-RAG] 📊 Tamanho médio por chunk: {len(pdf_text) // len(chunks) if chunks else 0:,} caracteres")
         
         # Criar embeddings para cada chunk em batch
         embeddings_to_add = []
+        total_chunks = len(chunks)
+        
+        print(f"[GEM-RAG] 🔄 Gerando embeddings para {total_chunks} chunks...")
         for idx, chunk in enumerate(chunks):
-            # Gerar embedding
-            embedding_vector = EmbeddingService.generate_embedding(chunk)
-            
-            # Criar embedding record
-            gem_embedding = GemDocumentEmbedding(
-                document_id=document_id,
-                embedding=embedding_vector,
-                embedding_model=settings.embedding_model,
-                chunk_text=chunk,
-                chunk_index=idx,
-            )
-            embeddings_to_add.append(gem_embedding)
+            try:
+                # Gerar embedding
+                embedding_vector = EmbeddingService.generate_embedding(chunk)
+                
+                # Criar embedding record
+                gem_embedding = GemDocumentEmbedding(
+                    document_id=document_id,
+                    embedding=embedding_vector,
+                    embedding_model=settings.embedding_model,
+                    chunk_text=chunk,
+                    chunk_index=idx,
+                )
+                embeddings_to_add.append(gem_embedding)
+                
+                # Log de progresso a cada 10 chunks
+                if (idx + 1) % 10 == 0 or (idx + 1) == total_chunks:
+                    print(f"[GEM-RAG] 📊 Progresso: {idx + 1}/{total_chunks} chunks processados ({(idx + 1) / total_chunks * 100:.1f}%)")
+            except Exception as e:
+                print(f"[GEM-RAG] ⚠️ Erro ao processar chunk {idx + 1}: {e}")
+                # Continuar com os outros chunks
+                continue
+        
+        if not embeddings_to_add:
+            raise ValueError("Nenhum embedding foi gerado com sucesso")
         
         # Batch insert
+        print(f"[GEM-RAG] 💾 Salvando {len(embeddings_to_add)} embeddings no banco...")
         db.add_all(embeddings_to_add)
         await db.commit()
         
-        print(f"[GEM-RAG] ✅ {len(embeddings_to_add)} embeddings criados")
+        print(f"[GEM-RAG] ✅ {len(embeddings_to_add)} embeddings criados e salvos com sucesso")
 
     @staticmethod
     async def search_gem_documents(
         query: str,
         gem_id: UUID,
         db: AsyncSession,
-        limit: int = 5,
-        similarity_threshold: float = 0.3,
+        limit: int = 10,  # Aumentado de 5 para 10 para mais contexto
+        similarity_threshold: float = 0.25,  # Reduzido de 0.3 para 0.25 para capturar mais resultados relevantes
     ) -> list[dict]:
         """
         Busca semântica nos documentos da Gem.

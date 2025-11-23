@@ -13,7 +13,7 @@ from sqlalchemy.orm import selectinload
 
 from app.config.database import get_db
 from app.core.dependencies import get_current_user
-from app.models.gem import Gem, GemDocument
+from app.models.gem import Gem, GemDocument, GemConversation, GemMessage
 from app.models.user import User
 from app.schemas.gem import (
     GemChatRequest,
@@ -271,17 +271,28 @@ async def add_document_to_gem(
         )
     
     # Validar arquivo
-    if not file.filename.lower().endswith('.pdf'):
+    if not file.filename or not file.filename.lower().endswith('.pdf'):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Apenas arquivos PDF são permitidos"
         )
     
-    if file.size and file.size > 10 * 1024 * 1024:  # 10MB
+    # Validar se o arquivo não está vazio
+    if file.size is not None and file.size == 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Arquivo muito grande. Máximo: 10MB"
+            detail="O arquivo está vazio"
         )
+    
+    # Limite aumentado para 100MB (GEMs são mais importantes)
+    MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
+    if file.size and file.size > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Arquivo muito grande. Máximo: 100MB (tamanho atual: {file.size / (1024 * 1024):.2f}MB)"
+        )
+    
+    print(f"[GEM-UPLOAD] 📄 Arquivo recebido: {file.filename} ({file.size / (1024 * 1024):.2f}MB)")
     
     # Criar diretório se não existir
     gem_dir = GEMS_STORAGE / str(gem_id)
@@ -305,6 +316,7 @@ async def add_document_to_gem(
     await db.refresh(gem_doc)
     
     # Processar PDF com RAG (assíncrono, não bloqueia)
+    print(f"[GEM-UPLOAD] 🔄 Iniciando processamento RAG do documento...")
     try:
         await GemRAGService.process_pdf_for_gem(
             gem_id=gem.id,
@@ -312,9 +324,13 @@ async def add_document_to_gem(
             file_path=str(file_path),
             db=db,
         )
+        print(f"[GEM-UPLOAD] ✅ Documento processado com sucesso e pronto para uso")
     except Exception as e:
         print(f"[GEM-UPLOAD] ⚠️ Erro ao processar PDF: {e}")
+        import traceback
+        traceback.print_exc()
         # Não falhar o upload, apenas logar o erro
+        # O documento foi salvo, mas os embeddings podem não estar prontos ainda
     
     # Recarregar Gem com documentos
     await db.refresh(gem, ["documents"])
@@ -391,7 +407,7 @@ async def remove_document_from_gem(
     "/{gem_id}/chat",
     response_model=GemChatResponse,
     summary="Chat com Gem",
-    description="Conversa com uma Gem específica usando RAG dos documentos.",
+    description="Conversa com uma Gem específica usando RAG dos documentos e memória persistente.",
 )
 async def chat_with_gem(
     gem_id: UUID,
@@ -399,7 +415,7 @@ async def chat_with_gem(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> GemChatResponse:
-    """Chat com Gem usando RAG."""
+    """Chat com Gem usando RAG e memória persistente."""
     # Validar Gem
     query = select(Gem).where(Gem.id == gem_id, Gem.user_id == current_user.id)
     result = await db.execute(query)
@@ -411,18 +427,69 @@ async def chat_with_gem(
             detail="Gem não encontrada"
         )
     
-    # Criar agente e responder
+    # Gerenciar conversa (criar nova ou usar existente)
+    conversation_id = request.conversation_id
+    if conversation_id:
+        # Verificar se a conversa existe e pertence ao usuário e à Gem
+        conv_query = select(GemConversation).where(
+            GemConversation.id == conversation_id,
+            GemConversation.gem_id == gem_id,
+            GemConversation.user_id == current_user.id,
+        )
+        conv_result = await db.execute(conv_query)
+        conversation = conv_result.scalar_one_or_none()
+        
+        if not conversation:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Conversa não encontrada ou não pertence a esta Gem"
+            )
+    else:
+        # Criar nova conversa
+        conversation = GemConversation(
+            gem_id=gem.id,
+            user_id=current_user.id,
+            title=request.message[:50] if len(request.message) > 50 else request.message,
+        )
+        db.add(conversation)
+        await db.flush()  # Para obter o ID
+        conversation_id = conversation.id
+        print(f"[GEM-CHAT] ✅ Nova conversa criada: {conversation_id}")
+    
+    # Salvar mensagem do usuário
+    user_message = GemMessage(
+        conversation_id=conversation_id,
+        role="user",
+        content=request.message,
+    )
+    db.add(user_message)
+    
+    # Criar agente e responder (com histórico)
     agent = GemAgent(gem)
     response = await agent.chat(
         message=request.message,
         user_id=current_user.id,
         db=db,
+        conversation_id=conversation_id,
     )
+    
+    # Salvar resposta do assistente
+    assistant_message = GemMessage(
+        conversation_id=conversation_id,
+        role="assistant",
+        content=response["response"],
+    )
+    db.add(assistant_message)
+    
+    # Atualizar timestamp da conversa (será atualizado automaticamente pelo onupdate)
+    
+    await db.commit()
     
     return GemChatResponse(
         response=response["response"],
-        gem_id=response["gem_id"],
+        gem_id=UUID(response["gem_id"]),
         gem_name=response["gem_name"],
+        conversation_id=conversation_id,
         sources_used=response["sources_used"],
     )
 
