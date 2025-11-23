@@ -207,7 +207,18 @@ Seja objetiva e baseada em boas práticas médicas."""
             generation_config=generation_config,
         )
         
+        # Obter data e hora atual
+        now = datetime.now()
+        current_date_str = now.strftime("%d/%m/%Y")
+        current_time_str = now.strftime("%H:%M")
+        current_day_name = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"][now.weekday()]
+        
         prompt = f"""Você é uma especialista em extrair calendários médicos de PDFs ou Excel com PRECISÃO ABSOLUTA.
+
+**DATA E HORA ATUAL:**
+- Data atual: {current_date_str} ({current_day_name})
+- Hora atual: {current_time_str}
+- Use esta informação como referência para entender o contexto temporal do calendário.
 
 **INFORMAÇÕES DO USUÁRIO:**
 - Grupo: {group_number}

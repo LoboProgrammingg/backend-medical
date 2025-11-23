@@ -19,6 +19,7 @@ from app.schemas.calendar import (
     CalendarListResponse,
     CalendarUploadRequest,
     CalendarEventResponse,
+    CalendarEventCreate,
 )
 from app.utils.pdf_processor import PDFProcessor
 from pathlib import Path
@@ -434,6 +435,75 @@ async def get_calendar(
         ],
         created_at=calendar.created_at.isoformat(),
         updated_at=calendar.updated_at.isoformat(),
+    )
+
+
+@router.post(
+    "/{calendar_id}/events",
+    response_model=CalendarEventResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Criar evento personalizado",
+    description="Adiciona um evento personalizado ao calendário.",
+)
+async def create_event(
+    calendar_id: UUID,
+    event_data: CalendarEventCreate,
+    current_user: Annotated[User, Depends(get_current_user)] = None,
+    db: Annotated[AsyncSession, Depends(get_db)] = None,
+) -> CalendarEventResponse:
+    """Cria um evento personalizado no calendário."""
+    # Verificar se o calendário existe e pertence ao usuário
+    query = select(Calendar).where(
+        Calendar.id == calendar_id,
+        Calendar.user_id == current_user.id,
+    )
+    result = await db.execute(query)
+    calendar = result.scalar_one_or_none()
+    
+    if not calendar:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Calendário não encontrado"
+        )
+    
+    # Verificar se a data está dentro do período do calendário
+    if event_data.event_date < calendar.start_date or event_data.event_date > calendar.end_date:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"A data do evento deve estar entre {calendar.start_date} e {calendar.end_date}"
+        )
+    
+    # Criar evento
+    event = CalendarEvent(
+        calendar_id=calendar.id,
+        event_type=event_data.event_type,
+        event_date=event_data.event_date,
+        day_of_week=event_data.day_of_week,
+        start_time=event_data.start_time,
+        end_time=event_data.end_time,
+        location=event_data.location,
+        shift_type=event_data.shift_type,
+        notes=event_data.notes,
+        preceptor=event_data.preceptor,
+        week_number=event_data.week_number,
+    )
+    
+    db.add(event)
+    await db.commit()
+    await db.refresh(event)
+    
+    return CalendarEventResponse(
+        id=event.id,
+        event_type=event.event_type,
+        event_date=event.event_date,
+        day_of_week=event.day_of_week,
+        start_time=event.start_time,
+        end_time=event.end_time,
+        location=event.location,
+        shift_type=event.shift_type,
+        notes=event.notes,
+        preceptor=event.preceptor,
+        week_number=event.week_number,
     )
 
 
