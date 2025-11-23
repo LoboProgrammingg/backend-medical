@@ -223,7 +223,14 @@ Seja objetiva e baseada em boas práticas médicas."""
         current_day_name = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"][now.weekday()]
         current_weekday_num = now.weekday()  # 0=Segunda, 6=Domingo
         
-        prompt = f"""Você é uma especialista em extrair calendários médicos de PDFs ou Excel com PRECISÃO ABSOLUTA.
+        prompt = f"""⚠️⚠️⚠️ INSTRUÇÃO CRÍTICA - LEIA COM ATENÇÃO ⚠️⚠️⚠️
+
+VOCÊ DEVE IGNORAR COMPLETAMENTE qualquer conhecimento sobre calendários que você tenha!
+NÃO use conhecimento sobre qual dia da semana uma data deveria ser em 2023, 2024, 2025 ou qualquer ano!
+O documento é a ÚNICA fonte de verdade - se o documento diz que 27/10 é Segunda, então É SEGUNDA, mesmo que você "saiba" que não é!
+DESABILITE qualquer validação automática de calendário - extraia EXATAMENTE como está no documento!
+
+Você é uma especialista em extrair calendários médicos de PDFs ou Excel com PRECISÃO ABSOLUTA.
 
 **REGRA FUNDAMENTAL ABSOLUTA - CONFIE 100% NO DOCUMENTO:**
 - O documento JÁ mostra as datas e os dias da semana CORRETOS nas colunas
