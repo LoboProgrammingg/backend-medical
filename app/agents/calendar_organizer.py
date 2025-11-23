@@ -379,13 +379,17 @@ Você DEVE retornar APENAS um JSON válido com esta estrutura:
   ]
 }}
 
-**REGRAS CRÍTICAS DE PRECISÃO:**
+**REGRAS CRÍTICAS DE PRECISÃO - ANO 2025:**
 - PRECISÃO ABSOLUTA: Todas as datas e dias da semana devem estar corretos
-- VALIDAÇÃO: Verificar se a data (DD/MM) corresponde ao dia da semana correto
+- ANO DE REFERÊNCIA: Todas as datas são de {current_year} (2025) - NÃO use 2023, 2024 ou qualquer outro ano!
+- VALIDAÇÃO OBRIGATÓRIA: Após extrair uma data DD/MM e um day_of_week, VERIFIQUE se correspondem em {current_year}:
+  * Exemplo 1: Se extraiu "02/11" como "Seg", verifique: 02/11/{current_year} é Segunda? Se não for, CORRIJA!
+  * Exemplo 2: Se extraiu "03/11" como "Dom", verifique: 03/11/{current_year} é Domingo? Se não for, CORRIJA!
+  * Exemplo 3: Se extraiu "09/11" como "Seg", verifique: 09/11/{current_year} é Segunda? Se não for, CORRIJA para o dia correto!
 - DIAS DA SEMANA: Seg, Ter, Qua, Qui, Sex, Sáb, Dom - identifique corretamente!
 - PLANTÕES: Se está na coluna "Dom", day_of_week DEVE ser "Dom", não "Ter"!
 - DATAS: Extrair APENAS no formato DD/MM (ex: "03/11", "04/11") - NÃO incluir o ano!
-- NÃO ADIVINHAR O ANO: Apenas extrair dia e mês como aparecem no PDF!
+- VALIDAÇÃO CRUZADA: Use a data atual ({current_date_str}) como referência para validar as datas extraídas
 - SEM ERROS: Um erro pode fazer o médico perder um plantão ou ir no dia errado!
 - APENAS JSON: Retorne APENAS o JSON, sem texto adicional
 - HORÁRIOS: Use formato HH:MM (24h)
