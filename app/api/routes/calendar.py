@@ -144,7 +144,7 @@ async def upload_calendar(
                     name=name,
                     position=position,
                 ),
-                timeout=220.0  # 180 segundos (3 minutos) para processar com IA
+                timeout=300.0  # 300 segundos (5 minutos) para processar com IA
             )
             print(f"[CALENDAR-UPLOAD] ✅ Dados extraídos pela IA")
         except asyncio.TimeoutError:

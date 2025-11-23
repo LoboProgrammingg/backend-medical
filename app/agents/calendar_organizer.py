@@ -496,7 +496,7 @@ Você DEVE retornar APENAS um JSON válido com esta estrutura:
                 
                 response = await asyncio.wait_for(
                     loop.run_in_executor(None, generate_sync),
-                    timeout=150.0  # 150 segundos (2.5 minutos) máximo para Gemini processar
+                    timeout=300.0  # 300 segundos (5 minutos) máximo para Gemini processar
                 )
                 
                 if not response or not hasattr(response, 'text'):
