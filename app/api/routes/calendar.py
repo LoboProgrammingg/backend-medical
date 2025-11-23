@@ -178,36 +178,88 @@ async def upload_calendar(
         db.add(calendar)
         await db.flush()  # Para obter o ID
         
-        # Função auxiliar para converter DD/MM para YYYY-MM-DD usando 2025 como ano
-        def parse_date_with_year(date_str: str, calendar_start: date, calendar_end: date) -> date:
-            """Converte DD/MM para YYYY-MM-DD usando 2025 como ano base."""
+        # Função auxiliar para converter DD/MM para YYYY-MM-DD e validar dia da semana
+        def parse_date_with_year(date_str: str, day_of_week: str, calendar_start: date, calendar_end: date) -> date:
+            """Converte DD/MM para YYYY-MM-DD validando o dia da semana."""
+            from datetime import timedelta
+            
             try:
                 # Tentar primeiro como DD/MM
                 day, month = map(int, date_str.split("/"))
-                # SEMPRE usar 2025 como ano (estamos em 2025)
-                year = 2025
+                
+                # Mapear dias da semana
+                day_map = {
+                    'Seg': 0, 'Segunda': 0,
+                    'Ter': 1, 'Terça': 1,
+                    'Qua': 2, 'Quarta': 2,
+                    'Qui': 3, 'Quinta': 3,
+                    'Sex': 4, 'Sexta': 4,
+                    'Sáb': 5, 'Sábado': 5,
+                    'Dom': 6, 'Domingo': 6,
+                }
+                
+                expected_weekday = day_map.get(day_of_week) if day_of_week else None
+                
+                # Tentar com o ano do período do calendário
+                year = calendar_start.year
                 event_date = date(year, month, day)
+                
+                # Se a data estiver antes do início, pode ser do próximo ano
+                if event_date < calendar_start:
+                    event_date = date(year + 1, month, day)
+                
+                # Se a data estiver depois do fim, pode ser do ano anterior
+                if event_date > calendar_end:
+                    event_date = date(year - 1, month, day)
+                
+                # Validar dia da semana se fornecido
+                if expected_weekday is not None:
+                    actual_weekday = event_date.weekday()
+                    if actual_weekday != expected_weekday:
+                        # Ajustar a data para corresponder ao dia da semana correto
+                        days_diff = expected_weekday - actual_weekday
+                        # Se a diferença for grande, pode ser que esteja no mês/ano errado
+                        if abs(days_diff) > 3:
+                            # Tentar ajustar para o próximo período de 7 dias
+                            if days_diff < 0:
+                                days_diff += 7
+                            event_date += timedelta(days=days_diff)
+                        else:
+                            event_date += timedelta(days=days_diff)
+                        
+                        # Verificar se ainda está no período
+                        if event_date < calendar_start or event_date > calendar_end:
+                            # Se não estiver, tentar o próximo mês
+                            if month == 12:
+                                event_date = date(year + 1, 1, day)
+                            else:
+                                event_date = date(year, month + 1, day)
+                        
+                        print(f"✅ [CALENDAR] Ajustada data {date_str} de {actual_weekday} para {expected_weekday}: {event_date}")
                 
                 # Validar que a data está dentro do período do calendário
                 if event_date < calendar_start or event_date > calendar_end:
-                    # Se estiver fora do período, pode ser que o calendário cruze o ano
-                    # Mas mantemos 2025 como padrão
-                    print(f"⚠️ [CALENDAR] Data {event_date} fora do período {calendar_start} - {calendar_end}, mas usando 2025")
+                    print(f"⚠️ [CALENDAR] Data {event_date} ainda fora do período {calendar_start} - {calendar_end}")
                 
                 return event_date
-            except (ValueError, AttributeError):
+            except (ValueError, AttributeError) as e:
                 # Se falhar, tentar como YYYY-MM-DD (compatibilidade)
                 try:
                     return datetime.strptime(date_str, "%Y-%m-%d").date()
                 except ValueError:
-                    raise ValueError(f"Formato de data inválido: {date_str}")
+                    raise ValueError(f"Formato de data inválido: {date_str} - {str(e)}")
         
         # Criar eventos em batch (muito mais rápido)
         events_to_add = []
         
         # Processar dias de trabalho
         for work_day in calendar_data.get("work_days", []):
-            event_date = parse_date_with_year(work_day["date"], calendar.start_date, calendar.end_date)
+            event_date = parse_date_with_year(
+                work_day["date"], 
+                work_day.get("day_of_week"),
+                calendar.start_date, 
+                calendar.end_date
+            )
             start_time_obj = None
             end_time_obj = None
             
@@ -231,7 +283,12 @@ async def upload_calendar(
         
         # Processar plantões
         for shift in calendar_data.get("on_call_shifts", []):
-            event_date = parse_date_with_year(shift["date"], calendar.start_date, calendar.end_date)
+            event_date = parse_date_with_year(
+                shift["date"],
+                shift.get("day_of_week"),
+                calendar.start_date,
+                calendar.end_date
+            )
             start_time_obj = None
             end_time_obj = None
             

@@ -310,7 +310,7 @@ O documento tem esta estrutura específica (como planilha):
    - Extrair local, tipo de plantão, horários
    - Confirmar que é realmente um plantão
 
-4. **VALIDAÇÃO DE DATAS E DIAS (OBRIGATÓRIO):**
+4. **VALIDAÇÃO DE DATAS E DIAS (OBRIGATÓRIO - CRÍTICO PARA PRECISÃO):**
    - VERIFICAR A ESTRUTURA DE COLUNAS: O PDF está estruturado como planilha com colunas
    - Cada coluna representa um dia da semana (Seg, Ter, Qua, Qui, Sex, Sáb, Dom)
    - O plantão pertence à COLUNA onde aparece, não ao texto ao redor
@@ -320,6 +320,9 @@ O documento tem esta estrutura específica (como planilha):
    - NÃO confundir: Se o plantão está na coluna "Dom", NÃO pode ser "Ter" ou qualquer outro dia!
    - VALIDAR: A data DD/MM deve estar na mesma linha/coluna do plantão
    - NÃO tentar adivinhar o ano - apenas extrair DD/MM!
+   - **VALIDAÇÃO CRÍTICA:** Após extrair a data DD/MM e o day_of_week, VERIFIQUE se a data corresponde ao dia da semana correto!
+   - Exemplo: Se extraiu "02/11" como "Seg", verifique: 02/11/2025 é realmente Segunda? Se não for, CORRIJA o day_of_week ou a data!
+   - Use a data atual ({current_date_str}) como referência para validar se as datas fazem sentido
 
 5. **EXTRAIR PRECEPTOR RESPONSÁVEL:**
    - Identificar o preceptor responsável de cada semana
