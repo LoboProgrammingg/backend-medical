@@ -269,14 +269,66 @@ O documento tem esta estrutura específica (como planilha):
    - Procurar pelo nome "{name}"
    - Confirmar que é a pessoa correta
 
-2. **EXTRAIR DIAS DE TRABALHO NORMAL:**
-   - Procurar por "Semana 1", "Semana 2", etc.
-   - Identificar os dias da semana: Seg, Ter, Qua, Qui, Sex, Sáb, Dom
-   - IMPORTANTE: Sáb = Sábado, Dom = Domingo - identifique corretamente!
-   - Extrair datas APENAS no formato DD/MM (ex: 03/11, 04/11) - NÃO converter para YYYY-MM-DD!
-   - NÃO tentar adivinhar o ano - extrair apenas dia e mês!
-   - Extrair locais, horários e tipos de turno
-   - Organizar por semana e dia da semana
+2. **EXTRAIR DIAS DE TRABALHO NORMAL (CRÍTICO - NÃO INVENTAR DATAS):**
+   
+   **ESTRUTURA DO DOCUMENTO:**
+   O documento tem esta estrutura EXATA:
+   - Cada semana tem uma seção "SEMANA X"
+   - Abaixo de "SEMANA X" há uma linha com cabeçalhos: "Setor:", "Local:", "Turno:", "Preceptor Responsável", seguido das datas DD/MM nas colunas dos dias
+   - Exemplo linha de datas: "Setor: | Local: | Turno: | Preceptor Responsável | 27/10 | 28/10 | 29/10 | 30/10 | 31/10 | 01/11 | 02/11"
+   - As colunas após "Preceptor Responsável" correspondem a: SEG | TER | QUA | QUI | SEX | SÁB | DOM
+   - Nas linhas seguintes, cada linha representa um turno, e nas colunas dos dias aparecem NÚMEROS que representam os GRUPOS
+   - Exemplo: Se na linha "Global | UPA2 | 07:00 - 13:00 | Mattheus | 1 | 1 | 1 | 1 | 1 | * | *"
+     Isso significa que o GRUPO 1 trabalha nesse turno nos dias Seg, Ter, Qua, Qui, Sex (colunas com "1")
+   
+   **REGRA FUNDAMENTAL:** Extrair APENAS os dias onde o número {group_number} aparece EXATAMENTE na tabela de cada semana!
+   
+   **PROCESSO OBRIGATÓRIO PARA DIAS DE TRABALHO:**
+   
+   1. **PARA CADA SEMANA (Semana 1, Semana 2, etc.):**
+      - Localizar a seção "SEMANA X"
+      - Encontrar a linha com as DATAS (ex: "27/10 | 28/10 | 29/10 | 30/10 | 31/10 | 01/11 | 02/11")
+      - Identificar qual coluna corresponde a qual dia da semana:
+        * Primeira coluna de data = SEG
+        * Segunda coluna de data = TER
+        * Terceira coluna de data = QUA
+        * Quarta coluna de data = QUI
+        * Quinta coluna de data = SEX
+        * Sexta coluna de data = SÁB
+        * Sétima coluna de data = DOM
+   
+   2. **PROCURAR O NÚMERO {group_number} NAS LINHAS DE TURNO:**
+      - Para cada linha de turno (após a linha de datas), verificar se o número {group_number} aparece
+      - O número pode aparecer sozinho (ex: "7") ou com outros (ex: "7 + 8" ou "1 + 7")
+      - Se o número {group_number} aparece na coluna de uma data específica, então esse é um dia de trabalho
+      - Exemplo: Se grupo=7 e na linha "Global | UPA2 | 13:00 - 19:00 | Ely | 2 + 8 | 2 + 8 | 2 + 8 | 2 + 8 | 2 + 8 | - | -"
+        E a linha de datas é "27/10 | 28/10 | 29/10 | 30/10 | 31/10 | 01/11 | 02/11"
+        Então o grupo 7 NÃO trabalha nesse turno (porque aparece "2 + 8", não "7")
+   
+   3. **QUANDO ENCONTRAR O NÚMERO {group_number}:**
+      - Identificar a COLUNA onde o número aparece (qual dia da semana)
+      - Pegar a DATA DD/MM da mesma coluna na linha de datas
+      - Extrair informações da LINHA:
+        * Setor: primeira coluna da linha
+        * Local: segunda coluna da linha
+        * Turno/Horário: terceira coluna da linha
+        * Preceptor: quarta coluna da linha
+      - Criar um evento de trabalho com essas informações
+   
+   4. **CRÍTICO - NÃO INVENTAR:**
+      - EXTRAIR APENAS os dias onde o número {group_number} REALMENTE aparece no documento
+      - NÃO criar dias de trabalho que não estão no documento
+      - NÃO assumir que todos os dias da semana têm trabalho
+      - Se o número {group_number} aparece apenas em Seg, Ter, Qua, Qui, Sex, então EXTRAIR APENAS esses dias
+      - Se não aparece em Sábado e Domingo, NÃO criar eventos para esses dias!
+      - Se aparece "*" ou "-" na coluna, significa que NÃO há trabalho nesse dia
+      - Se aparece outro número (ex: "1", "2", "3") mas não {group_number}, então NÃO há trabalho nesse dia
+   
+   5. **ORGANIZAR POR SEMANA:**
+      - Identificar qual semana (Semana 1, Semana 2, etc.)
+      - Extrair datas APENAS no formato DD/MM (ex: 03/11, 04/11) - NÃO converter para YYYY-MM-DD!
+      - NÃO tentar adivinhar o ano - extrair apenas dia e mês!
+      - Organizar por semana e dia da semana
 
 3. **EXTRAIR PLANTÕES (CRÍTICO - PRECISÃO ABSOLUTA):**
    
