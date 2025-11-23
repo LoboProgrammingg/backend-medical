@@ -156,13 +156,13 @@ class GemAgent(BaseAgent):
                 
                 print(f"[GEM-AGENT] 📜 Histórico recuperado: {len(conversation_history)} mensagens")
         
-        # Buscar contexto relevante nos documentos da Gem (aumentado para mais contexto)
+        # Buscar contexto relevante nos documentos da Gem (otimizado para máximo contexto)
         relevant_chunks = await GemRAGService.search_gem_documents(
             query=message,
             gem_id=self.gem.id,
             db=db,
-            limit=10,  # Mais chunks para contexto mais completo
-            similarity_threshold=0.25,  # Threshold mais baixo para capturar mais informações relevantes
+            limit=20,  # Aumentado para 20 chunks - GEMs precisam de contexto completo
+            similarity_threshold=0.20,  # Threshold reduzido para 0.20 - capturar mais informações relevantes
         )
         
         print(f"[GEM-AGENT] 📚 Chunks relevantes encontrados: {len(relevant_chunks)}")

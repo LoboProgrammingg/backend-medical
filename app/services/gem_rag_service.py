@@ -100,8 +100,8 @@ class GemRAGService:
         query: str,
         gem_id: UUID,
         db: AsyncSession,
-        limit: int = 10,  # Aumentado de 5 para 10 para mais contexto
-        similarity_threshold: float = 0.25,  # Reduzido de 0.3 para 0.25 para capturar mais resultados relevantes
+        limit: int = 20,  # Aumentado para 20 - GEMs precisam de contexto completo
+        similarity_threshold: float = 0.25,  # Reduzido para 0.20 - capturar mais informações relevantes
     ) -> list[dict]:
         """
         Busca semântica nos documentos da Gem.
