@@ -206,7 +206,7 @@ Seja objetiva e baseada em boas práticas médicas."""
         generation_config = {
             "max_output_tokens": settings.max_output_tokens,
             "top_k": settings.top_k,
-            "temperature": 0.1,  # Baixa temperatura para precisão
+            "temperature": 0.0,  # Temperatura ZERO para evitar uso de conhecimento de calendário
         }
         model = genai.GenerativeModel(
             settings.gemini_model,
