@@ -212,30 +212,40 @@ async def upload_calendar(
                 if event_date > calendar_end:
                     event_date = date(year - 1, month, day)
                 
-                # Validar dia da semana se fornecido
+                # Validar dia da semana se fornecido - CRÍTICO para corrigir datas erradas
                 if expected_weekday is not None:
                     actual_weekday = event_date.weekday()
                     if actual_weekday != expected_weekday:
-                        # Ajustar a data para corresponder ao dia da semana correto
+                        # Calcular diferença de dias
                         days_diff = expected_weekday - actual_weekday
-                        # Se a diferença for grande, pode ser que esteja no mês/ano errado
-                        if abs(days_diff) > 3:
-                            # Tentar ajustar para o próximo período de 7 dias
-                            if days_diff < 0:
-                                days_diff += 7
-                            event_date += timedelta(days=days_diff)
+                        
+                        # Normalizar diferença para o intervalo [-3, 3] (ajuste mais próximo)
+                        if days_diff > 3:
+                            days_diff -= 7
+                        elif days_diff < -3:
+                            days_diff += 7
+                        
+                        # Ajustar a data
+                        adjusted_date = event_date + timedelta(days=days_diff)
+                        
+                        # Verificar se a data ajustada está dentro do período
+                        if calendar_start <= adjusted_date <= calendar_end:
+                            event_date = adjusted_date
+                            print(f"✅ [CALENDAR] Ajustada data {date_str} ({day}/{month}) de dia {actual_weekday} para {expected_weekday}: {event_date}")
                         else:
-                            event_date += timedelta(days=days_diff)
-                        
-                        # Verificar se ainda está no período
-                        if event_date < calendar_start or event_date > calendar_end:
-                            # Se não estiver, tentar o próximo mês
+                            # Se não estiver no período, tentar próximo mês
                             if month == 12:
-                                event_date = date(year + 1, 1, day)
+                                next_date = date(year + 1, 1, day)
                             else:
-                                event_date = date(year, month + 1, day)
-                        
-                        print(f"✅ [CALENDAR] Ajustada data {date_str} de {actual_weekday} para {expected_weekday}: {event_date}")
+                                next_date = date(year, month + 1, day)
+                            
+                            if next_date.weekday() == expected_weekday and calendar_start <= next_date <= calendar_end:
+                                event_date = next_date
+                                print(f"✅ [CALENDAR] Ajustada data {date_str} para próximo mês: {event_date}")
+                            else:
+                                # Se ainda não corresponder, usar a data ajustada mesmo fora do período
+                                event_date = adjusted_date
+                                print(f"⚠️ [CALENDAR] Data ajustada {event_date} pode estar fora do período, mas dia da semana está correto")
                 
                 # Validar que a data está dentro do período do calendário
                 if event_date < calendar_start or event_date > calendar_end:
