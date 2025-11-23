@@ -215,15 +215,25 @@ Seja objetiva e baseada em boas práticas médicas."""
         
         # Obter data e hora atual
         now = datetime.now()
-        current_year = now.year
+        # FORÇAR 2025 - não usar o ano atual do sistema
+        current_year = 2025  # SEMPRE 2025 para calendários
         current_month = now.month
         current_day = now.day
-        current_date_str = now.strftime("%d/%m/%Y")
+        current_date_str = f"{now.day:02d}/{now.month:02d}/2025"  # Forçar 2025
         current_time_str = now.strftime("%H:%M")
         current_day_name = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"][now.weekday()]
         current_weekday_num = now.weekday()  # 0=Segunda, 6=Domingo
         
         prompt = f"""⚠️⚠️⚠️ INSTRUÇÃO CRÍTICA - LEIA COM ATENÇÃO ⚠️⚠️⚠️
+
+**🔥🔥🔥 ANO ABSOLUTO - ESTAMOS EM 2025 🔥🔥🔥**
+- ⚠️⚠️⚠️ TODAS AS DATAS DEVEM SER EM 2025 ⚠️⚠️⚠️
+- ⚠️⚠️⚠️ NUNCA USE 2023, 2024 OU QUALQUER OUTRO ANO ⚠️⚠️⚠️
+- O calendário é de OUTUBRO A DEZEMBRO DE 2025
+- start_date e end_date DEVEM ser "2025-10-XX" e "2025-12-XX"
+- Se você retornar 2023, o sistema vai CORRIGIR para 2025 automaticamente, mas é melhor você retornar correto!
+- **DATA ATUAL DO SISTEMA:** {current_date_str} (2025)
+- **ANO ATUAL:** {current_year} (2025)
 
 VOCÊ DEVE IGNORAR COMPLETAMENTE qualquer conhecimento sobre calendários que você tenha!
 NÃO use conhecimento sobre qual dia da semana uma data deveria ser em 2023, 2024, 2025 ou qualquer ano!
@@ -408,13 +418,16 @@ O documento tem esta estrutura específica (como planilha):
 
 6. **RETORNAR JSON ESTRUTURADO:**
 
-⚠️⚠️⚠️ ANO CRÍTICO - ESTAMOS EM 2025 ⚠️⚠️⚠️
-- O calendário é de 2025 (outubro a dezembro de 2025)
-- start_date e end_date DEVEM ser em 2025
-- NUNCA use 2023, 2024 ou qualquer outro ano!
+🔥🔥🔥 ANO CRÍTICO - ESTAMOS EM 2025 🔥🔥🔥
+- ⚠️⚠️⚠️ O calendário é de 2025 (outubro a dezembro de 2025) ⚠️⚠️⚠️
+- ⚠️⚠️⚠️ start_date e end_date DEVEM ser em 2025 ⚠️⚠️⚠️
+- ⚠️⚠️⚠️ NUNCA use 2023, 2024 ou qualquer outro ano! ⚠️⚠️⚠️
+- ⚠️⚠️⚠️ DATA ATUAL DO SISTEMA: {current_date_str} (2025) ⚠️⚠️⚠️
+- ⚠️⚠️⚠️ ANO ATUAL: {current_year} (2025) ⚠️⚠️⚠️
 - Exemplo: Se o calendário vai de 27/10 a 21/12, então:
-  * start_date: "2025-10-27" (NÃO 2023-10-27!)
-  * end_date: "2025-12-21" (NÃO 2023-12-21!)
+  * start_date: "2025-10-27" (NÃO 2023-10-27! NÃO 2024-10-27!)
+  * end_date: "2025-12-21" (NÃO 2023-12-21! NÃO 2024-12-21!)
+- **REPETINDO:** Se você retornar qualquer data com 2023 ou 2024, o sistema vai CORRIGIR para 2025, mas é CRÍTICO que você retorne 2025 desde o início!
 
 Você DEVE retornar APENAS um JSON válido com esta estrutura:
 
@@ -422,8 +435,8 @@ Você DEVE retornar APENAS um JSON válido com esta estrutura:
   "group_number": {group_number},
   "name": "{name}",
   "position": "{position}",
-  "start_date": "2025-MM-DD",  # ⚠️ SEMPRE 2025, NUNCA 2023!
-  "end_date": "2025-MM-DD",    # ⚠️ SEMPRE 2025, NUNCA 2023!
+  "start_date": "2025-MM-DD",  # 🔥 SEMPRE 2025, NUNCA 2023 ou 2024!
+  "end_date": "2025-MM-DD",    # 🔥 SEMPRE 2025, NUNCA 2023 ou 2024!
   "work_days": [
     {{
       "week": 1,
