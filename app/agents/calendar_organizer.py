@@ -209,16 +209,28 @@ Seja objetiva e baseada em boas práticas médicas."""
         
         # Obter data e hora atual
         now = datetime.now()
+        current_year = now.year
+        current_month = now.month
+        current_day = now.day
         current_date_str = now.strftime("%d/%m/%Y")
         current_time_str = now.strftime("%H:%M")
         current_day_name = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"][now.weekday()]
+        current_weekday_num = now.weekday()  # 0=Segunda, 6=Domingo
         
         prompt = f"""Você é uma especialista em extrair calendários médicos de PDFs ou Excel com PRECISÃO ABSOLUTA.
 
-**DATA E HORA ATUAL:**
+**CONTEXTO TEMPORAL CRÍTICO - ESTAMOS EM 2025:**
+- ANO ATUAL: {current_year} (2025)
 - Data atual: {current_date_str} ({current_day_name})
 - Hora atual: {current_time_str}
-- Use esta informação como referência para entender o contexto temporal do calendário.
+- Dia da semana atual: {current_day_name} (número {current_weekday_num}, onde 0=Segunda, 6=Domingo)
+
+**IMPORTANTE - VALIDAÇÃO DE DATAS:**
+- TODAS as datas extraídas devem ser do ANO {current_year} (2025)
+- Quando extrair uma data DD/MM, você DEVE verificar se essa data corresponde ao dia da semana correto em {current_year}
+- Exemplo: Se extrair "02/11" como "Segunda", verifique: 02/11/{current_year} é realmente Segunda-feira?
+- Se não corresponder, CORRIJA o dia da semana ou a data!
+- Use a data atual ({current_date_str}) como referência para entender qual semana/mês estamos
 
 **INFORMAÇÕES DO USUÁRIO:**
 - Grupo: {group_number}

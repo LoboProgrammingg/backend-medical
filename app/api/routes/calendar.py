@@ -180,7 +180,7 @@ async def upload_calendar(
         
         # Função auxiliar para converter DD/MM para YYYY-MM-DD e validar dia da semana
         def parse_date_with_year(date_str: str, day_of_week: str, calendar_start: date, calendar_end: date) -> date:
-            """Converte DD/MM para YYYY-MM-DD validando o dia da semana."""
+            """Converte DD/MM para YYYY-MM-DD validando o dia da semana usando 2025 como referência."""
             from datetime import timedelta
             
             try:
@@ -200,17 +200,44 @@ async def upload_calendar(
                 
                 expected_weekday = day_map.get(day_of_week) if day_of_week else None
                 
-                # Tentar com o ano do período do calendário
-                year = calendar_start.year
+                # SEMPRE começar com 2025 (ano atual)
+                year = 2025
                 event_date = date(year, month, day)
                 
-                # Se a data estiver antes do início, pode ser do próximo ano
-                if event_date < calendar_start:
-                    event_date = date(year + 1, month, day)
+                # Verificar se a data corresponde ao dia da semana esperado em 2025
+                if expected_weekday is not None:
+                    actual_weekday_2025 = event_date.weekday()
+                    
+                    if actual_weekday_2025 != expected_weekday:
+                        # A data não corresponde ao dia da semana em 2025 - ajustar
+                        days_diff = expected_weekday - actual_weekday_2025
+                        
+                        # Normalizar diferença para o intervalo [-3, 3]
+                        if days_diff > 3:
+                            days_diff -= 7
+                        elif days_diff < -3:
+                            days_diff += 7
+                        
+                        # Ajustar a data
+                        event_date = event_date + timedelta(days=days_diff)
+                        print(f"✅ [CALENDAR] Ajustada data {date_str} de {actual_weekday_2025} para {expected_weekday} em 2025: {event_date}")
                 
-                # Se a data estiver depois do fim, pode ser do ano anterior
+                # Verificar se está dentro do período do calendário
+                if event_date < calendar_start:
+                    # Se estiver antes, pode ser do próximo ano (2026)
+                    next_year_date = date(2026, month, day)
+                    if expected_weekday is not None and next_year_date.weekday() == expected_weekday:
+                        if next_year_date <= calendar_end:
+                            event_date = next_year_date
+                            print(f"✅ [CALENDAR] Data ajustada para 2026: {event_date}")
+                
                 if event_date > calendar_end:
-                    event_date = date(year - 1, month, day)
+                    # Se estiver depois, pode ser do ano anterior (2024)
+                    prev_year_date = date(2024, month, day)
+                    if expected_weekday is not None and prev_year_date.weekday() == expected_weekday:
+                        if prev_year_date >= calendar_start:
+                            event_date = prev_year_date
+                            print(f"✅ [CALENDAR] Data ajustada para 2024: {event_date}")
                 
                 # Validar dia da semana se fornecido - CRÍTICO para corrigir datas erradas
                 if expected_weekday is not None:
