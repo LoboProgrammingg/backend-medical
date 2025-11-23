@@ -219,18 +219,16 @@ Seja objetiva e baseada em boas práticas médicas."""
         
         prompt = f"""Você é uma especialista em extrair calendários médicos de PDFs ou Excel com PRECISÃO ABSOLUTA.
 
-**CONTEXTO TEMPORAL - ESTAMOS EM 2025:**
-- ANO ATUAL: {current_year} (2025)
-- Data atual: {current_date_str} ({current_day_name})
-- Hora atual: {current_time_str}
-
-**REGRA FUNDAMENTAL - CONFIE NO DOCUMENTO:**
+**REGRA FUNDAMENTAL ABSOLUTA - CONFIE 100% NO DOCUMENTO:**
 - O documento JÁ mostra as datas e os dias da semana CORRETOS nas colunas
-- NÃO tente validar ou corrigir usando calendários externos!
-- Se a data "27/10" está na coluna "SEG", então day_of_week = "Seg" - SEM VALIDAÇÃO!
-- Se a data "03/11" está na coluna "DOM", então day_of_week = "Dom" - SEM VALIDAÇÃO!
-- O documento é a FONTE DA VERDADE - extraia exatamente como está!
-- NÃO use conhecimento de calendário para "corrigir" - o documento já está correto!
+- NÃO tente validar, verificar ou corrigir usando conhecimento de calendário!
+- NÃO use conhecimento sobre qual dia da semana uma data deveria ser!
+- NÃO compare com calendários de 2023, 2024, 2025 ou qualquer outro ano!
+- Se a data "27/10" está na coluna "SEG", então day_of_week = "Seg" - PONTO FINAL!
+- Se a data "03/11" está na coluna "DOM", então day_of_week = "Dom" - PONTO FINAL!
+- O documento é a ÚNICA FONTE DA VERDADE - extraia exatamente como está!
+- IGNORE completamente qualquer conhecimento sobre calendários que você tenha!
+- Se o documento diz que 27/10 é Segunda, então É SEGUNDA, mesmo que você "saiba" que não é!
 
 **INFORMAÇÕES DO USUÁRIO:**
 - Grupo: {group_number}
