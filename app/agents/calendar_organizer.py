@@ -219,18 +219,18 @@ Seja objetiva e baseada em boas práticas médicas."""
         
         prompt = f"""Você é uma especialista em extrair calendários médicos de PDFs ou Excel com PRECISÃO ABSOLUTA.
 
-**CONTEXTO TEMPORAL CRÍTICO - ESTAMOS EM 2025:**
+**CONTEXTO TEMPORAL - ESTAMOS EM 2025:**
 - ANO ATUAL: {current_year} (2025)
 - Data atual: {current_date_str} ({current_day_name})
 - Hora atual: {current_time_str}
-- Dia da semana atual: {current_day_name} (número {current_weekday_num}, onde 0=Segunda, 6=Domingo)
 
-**IMPORTANTE - VALIDAÇÃO DE DATAS:**
-- TODAS as datas extraídas devem ser do ANO {current_year} (2025)
-- Quando extrair uma data DD/MM, você DEVE verificar se essa data corresponde ao dia da semana correto em {current_year}
-- Exemplo: Se extrair "02/11" como "Segunda", verifique: 02/11/{current_year} é realmente Segunda-feira?
-- Se não corresponder, CORRIJA o dia da semana ou a data!
-- Use a data atual ({current_date_str}) como referência para entender qual semana/mês estamos
+**REGRA FUNDAMENTAL - CONFIE NO DOCUMENTO:**
+- O documento JÁ mostra as datas e os dias da semana CORRETOS nas colunas
+- NÃO tente validar ou corrigir usando calendários externos!
+- Se a data "27/10" está na coluna "SEG", então day_of_week = "Seg" - SEM VALIDAÇÃO!
+- Se a data "03/11" está na coluna "DOM", então day_of_week = "Dom" - SEM VALIDAÇÃO!
+- O documento é a FONTE DA VERDADE - extraia exatamente como está!
+- NÃO use conhecimento de calendário para "corrigir" - o documento já está correto!
 
 **INFORMAÇÕES DO USUÁRIO:**
 - Grupo: {group_number}
@@ -379,17 +379,19 @@ Você DEVE retornar APENAS um JSON válido com esta estrutura:
   ]
 }}
 
-**REGRAS CRÍTICAS DE PRECISÃO - ANO 2025:**
-- PRECISÃO ABSOLUTA: Todas as datas e dias da semana devem estar corretos
-- ANO DE REFERÊNCIA: Todas as datas são de {current_year} (2025) - NÃO use 2023, 2024 ou qualquer outro ano!
-- VALIDAÇÃO OBRIGATÓRIA: Após extrair uma data DD/MM e um day_of_week, VERIFIQUE se correspondem em {current_year}:
-  * Exemplo 1: Se extraiu "02/11" como "Seg", verifique: 02/11/{current_year} é Segunda? Se não for, CORRIJA!
-  * Exemplo 2: Se extraiu "03/11" como "Dom", verifique: 03/11/{current_year} é Domingo? Se não for, CORRIJA!
-  * Exemplo 3: Se extraiu "09/11" como "Seg", verifique: 09/11/{current_year} é Segunda? Se não for, CORRIJA para o dia correto!
-- DIAS DA SEMANA: Seg, Ter, Qua, Qui, Sex, Sáb, Dom - identifique corretamente!
-- PLANTÕES: Se está na coluna "Dom", day_of_week DEVE ser "Dom", não "Ter"!
+**REGRAS CRÍTICAS DE PRECISÃO - CONFIE NO DOCUMENTO:**
+- PRECISÃO ABSOLUTA: Extraia EXATAMENTE como está no documento - SEM VALIDAÇÃO EXTERNA!
+- FONTE DA VERDADE: O documento JÁ tem as datas e dias da semana corretos nas colunas
+- NÃO VALIDE: NÃO tente verificar se a data corresponde ao dia da semana usando calendários!
+- NÃO CORRIJA: NÃO tente "corrigir" baseado em conhecimento de calendário!
+- EXTRAÇÃO DIRETA: Se "27/10" está na coluna "SEG", então:
+  * date: "27/10"
+  * day_of_week: "Seg"
+  * FIM - não precisa verificar mais nada!
+- DIAS DA SEMANA: Seg, Ter, Qua, Qui, Sex, Sáb, Dom - use exatamente como aparece na coluna!
+- PLANTÕES: Se está na coluna "Dom", day_of_week DEVE ser "Dom" - SEM EXCEÇÃO!
 - DATAS: Extrair APENAS no formato DD/MM (ex: "03/11", "04/11") - NÃO incluir o ano!
-- VALIDAÇÃO CRUZADA: Use a data atual ({current_date_str}) como referência para validar as datas extraídas
+- ANO: Todas as datas são de {current_year} (2025) - mas NÃO valide isso, apenas use como referência
 - SEM ERROS: Um erro pode fazer o médico perder um plantão ou ir no dia errado!
 - APENAS JSON: Retorne APENAS o JSON, sem texto adicional
 - HORÁRIOS: Use formato HH:MM (24h)
