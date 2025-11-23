@@ -186,14 +186,58 @@ async def upload_calendar(
         
         # Criar calendário no banco
         calendar_title = title or f"Calendário {name} - Grupo {group_number}"
+        
+        # FORÇAR 2025 nas datas de início e fim (a IA pode estar retornando 2023)
+        start_date_str = calendar_data.get("start_date", "")
+        end_date_str = calendar_data.get("end_date", "")
+        
+        # Se a data contém 2023, substituir por 2025
+        if "2023" in start_date_str:
+            print(f"⚠️ [CALENDAR] Data de início contém 2023! Corrigindo para 2025...")
+            start_date_str = start_date_str.replace("2023", "2025")
+        if "2023" in end_date_str:
+            print(f"⚠️ [CALENDAR] Data de fim contém 2023! Corrigindo para 2025...")
+            end_date_str = end_date_str.replace("2023", "2025")
+        
+        # Se a data contém 2024, substituir por 2025 (caso o calendário seja de out-dez 2025)
+        if "2024" in start_date_str and "10" in start_date_str or "11" in start_date_str or "12" in start_date_str:
+            print(f"⚠️ [CALENDAR] Data de início contém 2024! Corrigindo para 2025...")
+            start_date_str = start_date_str.replace("2024", "2025")
+        if "2024" in end_date_str and "10" in end_date_str or "11" in end_date_str or "12" in end_date_str:
+            print(f"⚠️ [CALENDAR] Data de fim contém 2024! Corrigindo para 2025...")
+            end_date_str = end_date_str.replace("2024", "2025")
+        
+        # Garantir que as datas são de 2025
+        try:
+            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+            end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+            
+            # Se ainda não for 2025, forçar
+            if start_date.year != 2025:
+                print(f"⚠️ [CALENDAR] Forçando ano 2025 para start_date: {start_date} -> 2025-{start_date.month:02d}-{start_date.day:02d}")
+                start_date = date(2025, start_date.month, start_date.day)
+            if end_date.year != 2025:
+                print(f"⚠️ [CALENDAR] Forçando ano 2025 para end_date: {end_date} -> 2025-{end_date.month:02d}-{end_date.day:02d}")
+                end_date = date(2025, end_date.month, end_date.day)
+        except ValueError as e:
+            print(f"❌ [CALENDAR] Erro ao parsear datas: {e}")
+            print(f"   start_date_str: {start_date_str}")
+            print(f"   end_date_str: {end_date_str}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Erro ao processar datas do calendário: {str(e)}"
+            )
+        
+        print(f"✅ [CALENDAR] Datas finais: start_date={start_date}, end_date={end_date}")
+        
         calendar = Calendar(
             user_id=current_user.id,
             title=calendar_title,
             group_number=calendar_data.get("group_number", group_number),
             name_in_calendar=calendar_data.get("name", name),
             position_in_list=calendar_data.get("position", position),
-            start_date=datetime.strptime(calendar_data["start_date"], "%Y-%m-%d").date(),
-            end_date=datetime.strptime(calendar_data["end_date"], "%Y-%m-%d").date(),
+            start_date=start_date,
+            end_date=end_date,
             source_file=file.filename,
         )
         db.add(calendar)

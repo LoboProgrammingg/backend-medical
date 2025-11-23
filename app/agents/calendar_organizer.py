@@ -408,14 +408,22 @@ O documento tem esta estrutura específica (como planilha):
 
 6. **RETORNAR JSON ESTRUTURADO:**
 
+⚠️⚠️⚠️ ANO CRÍTICO - ESTAMOS EM 2025 ⚠️⚠️⚠️
+- O calendário é de 2025 (outubro a dezembro de 2025)
+- start_date e end_date DEVEM ser em 2025
+- NUNCA use 2023, 2024 ou qualquer outro ano!
+- Exemplo: Se o calendário vai de 27/10 a 21/12, então:
+  * start_date: "2025-10-27" (NÃO 2023-10-27!)
+  * end_date: "2025-12-21" (NÃO 2023-12-21!)
+
 Você DEVE retornar APENAS um JSON válido com esta estrutura:
 
 {{
   "group_number": {group_number},
   "name": "{name}",
   "position": "{position}",
-  "start_date": "YYYY-MM-DD",
-  "end_date": "YYYY-MM-DD",
+  "start_date": "2025-MM-DD",  # ⚠️ SEMPRE 2025, NUNCA 2023!
+  "end_date": "2025-MM-DD",    # ⚠️ SEMPRE 2025, NUNCA 2023!
   "work_days": [
     {{
       "week": 1,
